@@ -298,65 +298,59 @@ test('a cancellation aborts the in-flight request instead of writing anything', 
   }
 })
 
-test('the label is the topmost layer and no effect layer can blend over it', async () => {
+test('the pill contains every light layer, and the label is the topmost of them', async () => {
   const { button } = await boot()
   const renderer = await mount(button, seatProps())
 
-  // structure: no light layer outside the pill, a compact spark beside the icon, the
-  // label on top. An earlier revision put a wide bloom behind the pill; it fogged the
-  // composer row, so the rule now is that nothing glows outside the pill at all.
   const seat = renderer.root.findAllByProps({ className: 'dip-seat' })
-  const spark = renderer.root.findAllByProps({ className: 'dip-spark' })
-  const label = renderer.root.findAllByProps({ className: 'dip-label' })
   assert.equal(seat.length, 1)
-  assert.equal(spark.length, 1)
-  assert.equal(label.length, 1)
-  assert.equal(spark[0].props['aria-hidden'], 'true')
-  const children = seat[0].children.map((c) => (typeof c === 'string' ? c : c.props.className))
-  assert.deepEqual(children, ['dip-btn'])
-  // and the spark must sit inside the pill, before the label
+  // the seat holds the pill and nothing else: no light layer lives outside the chip
+  const seatChildren = seat[0].children.map((c) => (typeof c === 'string' ? c : c.props.className))
+  assert.deepEqual(seatChildren, ['dip-btn'])
+
+  // inside the pill, the order is: contained light, rim light, spark, icon, label
   const pill = renderer.root.findAllByProps({ className: 'dip-btn' })[0]
   const inner = pill.children.map((c) => (typeof c === 'string' ? c : c.props.className))
-  assert.deepEqual(inner, ['dip-spark', 'dip-icon', 'dip-label'])
+  assert.deepEqual(inner, ['dip-aurora', 'dip-ring', 'dip-spark', 'dip-icon', 'dip-label'])
+  for (const decor of ['dip-aurora', 'dip-ring', 'dip-spark']) {
+    const el = renderer.root.findAllByProps({ className: decor })[0]
+    assert.equal(el.props['aria-hidden'], 'true', decor + ' is decoration, never content')
+  }
 })
 
 test('the stylesheet keeps the guarantees the legibility check relies on', async () => {
   const fs = await import('node:fs')
   const css = fs.readFileSync(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
 
-  // a blend mode on the FX layer would composite against the seat's isolated group
-  // instead of the page, which is what previously washed the glow to grey
-  assert.ok(!/mix-blend-mode/.test(css), 'no blend modes on the FX layer')
+  // containment: the pill clips, so no inside layer can escape it, and the aurora is inset:0
+  assert.match(css, /\.dip-btn\{[^}]*overflow:hidden/)
+  assert.match(css, /\.dip-aurora\{position:absolute;inset:0/)
+  assert.match(css, /\.dip-ring\{position:absolute;inset:0/)
+  // no light layer outside the pill: no bloom rule, no blend modes
+  assert.ok(!/\.dip-bloom\{/.test(css), 'no layer outside the pill')
+  assert.ok(!/mix-blend-mode/.test(css), 'no blend modes on the light layers')
 
-  // the label owns a stacking level above every effect layer
+  // the chip speaks the dsh-plan-board language: dark glass plate + four-stop gradient rim
+  assert.match(css, /padding-box/, 'plate and rim are two layers of one background')
+  // the rim is CONIC, not linear: a linear ramp only shows its first quarter on a 66px chip
+  assert.match(css, /RIM = 'conic-gradient\(/, 'the rim is width-independent')
+  assert.match(css, /PLATE = 'linear-gradient\(135deg,#061024/, 'the plate is the dark navy glass')
+  assert.match(css, /INK = '#f2f7ff'/, 'near-white ink is what makes it readable in both themes')
+  assert.ok(!/data-mode|prefers-color-scheme/.test(css), 'the plate does not invert per theme')
+  // and the palette is this plugin's own: cyan/blue with a gold accent, NOT the reference
+  // plugin's violet/magenta ramp (its craft was borrowed, its colours were not)
+  assert.ok(!/#8b5cf6|#e879f9|#a855f7|#7c3aed|#e879f9/.test(css), 'no borrowed violet/magenta hues')
+
+  // the label owns a stacking level above every light layer
   assert.match(css, /\.dip-label\{position:relative;z-index:2/)
 
-  // the spark is a filled sprite, so its box must stay clear of the label's box; the
-  // label box starts after the pill's left padding + the icon + the flex gap
+  // the spark is a filled sprite: its box must stay clear of the label's box
   const sparkLeft = Number(/\.dip-spark\{position:absolute;left:(\d+)px/.exec(css)?.[1])
   const sparkWidth = Number(/left:\d+px;top:50%;width:(\d+)px/.exec(css)?.[1])
-  const pad = Number(/\.dip-btn\{[^}]*padding:0 (\d+)px/.exec(css)?.[1])
-  const labelStart = pad + 14 + 6
+  const pad = Number(/\.dip-btn\{[^}]*padding:0 \d+px 0 (\d+)px/.exec(css)?.[1])
+  const labelStart = pad + 15 + 6
   assert.ok(sparkLeft + sparkWidth <= labelStart,
     'spark box must end before the label box: ' + String(sparkLeft + sparkWidth) + ' vs ' + String(labelStart))
-
-  // a lit pill is an opaque pill: every state that turns the bloom up must paint a
-  // solid theme surface under the text (located by plain search, so no regex escaping
-  // can silently turn a selector into something that matches nothing)
-  for (const marker of ['.dip-btn:hover:not(:disabled){', '.dip-btn[data-busy="true"]{']) {
-    const at = css.indexOf(marker)
-    assert.ok(at >= 0, 'state block present: ' + marker)
-    const block = css.slice(at, css.indexOf('}', at))
-    assert.match(block, /var\(--dsw-alias-bg-elevated/, 'lit states sit on a solid theme surface: ' + marker)
-  }
-  // no light source lives outside the pill: no wide bloom RULE (the design note may still
-  // mention the dropped layer by name), and the border arc is masked to the 1px band with
-  // only a tight glow — fog is the failure mode this forbids
-  assert.ok(!/\.dip-bloom\{/.test(css), 'no wide bloom rule outside the pill')
-  const arc = css.slice(css.indexOf('.dip-btn::after{'), css.indexOf('.dip-btn:hover:not(:disabled)::after{'))
-  assert.match(arc, /mask-composite:exclude/, 'the border arc is masked to the border band')
-  const arcGlow = Number(/filter:drop-shadow\(0 0 (\d+)px rgba\(56,189,248/.exec(arc)?.[1])
-  assert.ok(arcGlow > 0 && arcGlow <= 2, 'the border glow stays tight, got ' + String(arcGlow) + 'px')
 
   // motion preferences never touch legibility, only movement
   assert.match(css, /prefers-reduced-motion: reduce/)

@@ -25,12 +25,26 @@ export interface SeatProps {
 
 const API = '/dsh-improve-prompt/api/improve'
 
-/** Four-point sparkle — the same affordance WorkBuddy puts at the composer's corner. */
+/**
+ * Four-point sparkle — the same affordance WorkBuddy puts at the composer's corner.
+ *
+ * Filled with the plugin's own cyan-to-gold gradient rather than a flat colour. The
+ * gradient is defined inside the SVG (browsers resolve the first matching id for every
+ * instance, and every instance wants the same gradient), and it is only safe to use a
+ * fixed bright gradient because the chip's plate is always dark in both themes.
+ */
 function Sparkle(): React.ReactElement {
   return React.createElement('svg', { className: 'dip-icon', viewBox: '0 0 16 16', 'aria-hidden': 'true', focusable: 'false' },
+    React.createElement('defs', null,
+      React.createElement('linearGradient', { id: 'dip-spark-grad', x1: '0', y1: '0', x2: '1', y2: '1' },
+        React.createElement('stop', { offset: '0', stopColor: '#e8f6ff' }),
+        React.createElement('stop', { offset: '.55', stopColor: '#38bdf8' }),
+        React.createElement('stop', { offset: '1', stopColor: '#f5c542' }),
+      ),
+    ),
     React.createElement('path', {
       d: 'M8 1.2l1.35 3.9a2 2 0 001.25 1.25l3.9 1.35-3.9 1.35a2 2 0 00-1.25 1.25L8 14.8l-1.35-3.9a2 2 0 00-1.25-1.25L1.5 8.3l3.9-1.35A2 2 0 006.65 5.7L8 1.2z',
-      fill: 'currentColor',
+      fill: 'url(#dip-spark-grad)',
     }),
   )
 }
@@ -169,6 +183,8 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
       title,
       onClick,
     },
+    React.createElement('span', { className: 'dip-aurora', 'aria-hidden': 'true' }),
+    React.createElement('span', { className: 'dip-ring', 'aria-hidden': 'true' }),
     React.createElement('span', { className: 'dip-spark', 'aria-hidden': 'true' }),
     Sparkle(),
     React.createElement('span', { className: 'dip-label' }, modeLabel),

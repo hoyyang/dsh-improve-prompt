@@ -1,36 +1,34 @@
 /**
  * Plugin-owned CSS, scoped by a data attribute and torn down with the fiber.
  *
- * ## Design principle: crisp geometry first, light second
+ * ## Material: the dark aurora-glass chip (aligned with dsh-plan-board / dsh-android-pane)
  *
- * A 28px control lives in a dense toolbar. Two earlier revisions of this button failed
- * the same way — once with a hairline border and no material, once with a wide bloom
- * that fogged the whole row. The lesson is in the shape of this file: **the pill is a
- * precision object, and every light source is contained inside it.**
+ * Two revisions of this button chased "more light" and both failed: a hairline outline with
+ * no material, then a wide bloom that fogged the whole composer row. The plugin sitting in
+ * the same toolbar that got it right is dsh-plan-board, so this file now speaks its language:
  *
- * - **plate** — idle is a ghost like its neighbours; hover and beyond switch to a solid
- *   theme surface with a top sheen, a crisp 1px border and a tight coloured shadow.
- *   Nothing outside the pill is ever blurred.
- * - **border light** — a 1px conic arc that travels around the border band, with only a
- *   2px drop-shadow. It reads as light on the edge, not as an outline and not as fog.
- * - **icon** — the accent. Inline SVG in `currentColor` with a tight 3px glow, plus a
- *   generated spark sprite at its own size for the aura. It scales and turns on hover
- *   and spins while busy.
+ * - **the plate is always dark** — `#080b14 -> #120a20` glass, in both themes. It is not
+ *   inverted on a light theme; a dark chip simply reads as a chip there, and it is the only
+ *   way one set of accent colours can stay legible on both backgrounds.
+ * - **the border is a four-stop gradient** — cyan -> sky -> violet -> magenta, painted with the
+ *   `padding-box / border-box` double-background trick, so the rim is part of the shape.
+ * - **the aurora lives inside the pill** — three soft radial washes at `inset:0`, never a
+ *   glow outside it. Light is contained; the earlier fog is structurally impossible.
+ * - **the label is near-white on that dark plate** — `#f3f7ff`, which is ~18:1 against the
+ *   plate in either theme, plus a dark text-shadow that keeps the glyph edges crisp.
  *
- * ## Layer order (this is what guarantees the label stays legible)
+ * ## Layer order (the legibility guarantee)
  *
- * `.dip-seat` — positioning context, `isolation:isolate`
- *   `.dip-btn`  — `z-index:1`, owns its own background
- *     `.dip-spark` — `z-index:1`, a compact sprite in the icon slot, entirely
- *                     left of the label (3px + 18px ends well before the label at 29px)
- *     `.dip-icon`  — inline SVG, crisp at any DPI
- *     `.dip-label` — `z-index:2`, the topmost element in the seat
+ * `.dip-btn` — the pill; `overflow:hidden`, so nothing inside can escape it
+ *   `.dip-aurora` — contained washes, `z-index:0`, `pointer-events:none`
+ *   `.dip-ring`   — conic gradient masked to the 1px border band
+ *   `.dip-spark`  — generated sprite, icon slot only, ends 9px before the label box
+ *   `.dip-icon`   — inline SVG, near-white with a tight cyan glow
+ *   `.dip-label`  — `z-index:2`, topmost
  *
- * The border arc is masked to the 1px band, which the label's padding box never reaches,
- * and a lit pill is always an opaque pill — so no light source can sit under a glyph.
- *
- * Measured, not asserted: `npm run harness:button` renders every state from this file and
- * the real component, then asserts the geometry and the WCAG contrast of the label.
+ * Because the plate never turns translucent and no layer brightens under the glyphs, the
+ * measured contrast is the same in every state and both themes. `npm run harness:button`
+ * renders every state from this file plus the real component and asserts it.
  *
  * @module dsh-improve-prompt/client/styles
  */
@@ -39,100 +37,103 @@ import { AURA_URI } from './assets.js'
 
 export const STYLE_ATTR = 'dsh-improve-prompt'
 
-/** Durations in one place, so the reduced-motion block can neutralise them together. */
-const D = {
-  arcSlow: '3.2s',
-  arcFast: '1.2s',
-  iconSpin: '1.1s',
-  sparkPulse: '1.6s',
-} as const
-
-/** Registered so the conic arc angle can interpolate; without @property it renders static. */
-const AT_PROPERTY = '@property --dip-a{syntax:"<angle>";initial-value:0deg;inherits:false}'
+/**
+ * The plugin's own palette — cyan -> electric blue with a single gold accent, the same
+ * family as the project banner. Deliberately NOT the reference plugin's violet/magenta
+ * ramp: what is borrowed from dsh-plan-board is the craft, not the colours.
+ */
+const INK = '#f2f7ff'
+/** Deep navy glass. It never inverts per theme — that is what lets one accent set read on both. */
+const PLATE = 'linear-gradient(135deg,#061024 0%,#08182e 52%,#0c2144 100%)'
+/**
+ * The rim. A LINEAR ramp only shows its first quarter on a 66px chip — measured against
+ * the reference, cyan appeared and everything after it never did. A conic ramp is
+ * width-independent, so every hue of this palette is always on the rim.
+ */
+const RIM = 'conic-gradient(from 200deg at 50% 50%,#22d3ee 0%,#38bdf8 15%,#2b6cff 38%,#1d4ed8 52%,#f5c542 80%,#ffe9a8 90%,#22d3ee 100%)'
+/** Contained light: three washes, all inside the pill. Gold is the accent, not a field. */
+const AURORA = [
+  'radial-gradient(30% 62% at 16% 48%,rgba(34,211,238,.42),transparent 70%)',
+  'radial-gradient(28% 62% at 86% 42%,rgba(37,99,235,.46),transparent 72%)',
+  'radial-gradient(34% 70% at 62% 116%,rgba(245,197,66,.26),transparent 74%)',
+  // the body stays dark between the pools: that contrast is what reads as glass, not jelly
+  'radial-gradient(130% 160% at 50% 50%,rgba(6,20,48,.66),transparent 80%)',
+].join(',')
 
 export const css = [
-  AT_PROPERTY,
-
   '.dip-root{display:inline-flex;align-items:center;gap:2px;flex:none}',
   '.dip-seat{position:relative;display:inline-flex;isolation:isolate}',
 
-  /* ---------- the pill: a crisp object, never a glow ---------- */
-  '.dip-btn{position:relative;z-index:1;height:28px;min-width:28px;padding:0 10px;display:inline-flex;',
-  'align-items:center;gap:6px;cursor:pointer;background:0 0;border:1px solid transparent;border-radius:24px;',
-  'outline:none;color:var(--dsw-alias-label-secondary);font-size:12px;font-weight:500;line-height:20px;',
-  // only cheap, compositor-friendly properties animate; nothing here blurs the outline
-  'transition:background-color .18s ease,color .18s ease,border-color .18s ease,box-shadow .24s ease,',
-  'transform .13s cubic-bezier(.22,1,.36,1);will-change:transform}',
+  /* ---------- the chip ---------- */
+  '.dip-btn{position:relative;display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;',
+  'height:28px;padding:0 10px 0 9px;border-radius:999px;cursor:pointer;overflow:hidden;user-select:none;',
+  'vertical-align:middle;line-height:1;font-size:12px;font-weight:600;letter-spacing:.15px;color:' + INK + ';',
+  'border:1px solid transparent;',
+  'background:' + PLATE + ' padding-box,' + RIM + ' border-box;',
+  // specular top band + gold light catching the lower edge + a tight cyan halo
+  'box-shadow:0 0 0 1px rgba(56,189,248,.22),0 2px 12px rgba(43,108,255,.34),0 2px 18px rgba(245,197,66,.18),',
+  'inset 0 1px 0 rgba(255,255,255,.26),inset 0 2px 5px rgba(226,244,255,.10),',
+  'inset 0 -1px 0 rgba(245,197,66,.18),inset 0 0 14px rgba(43,108,255,.28),0 2px 6px rgba(0,0,0,.34);',
+  'transition:transform .16s cubic-bezier(.34,1.56,.64,1),box-shadow .28s,filter .28s}',
 
-  /* the label is the topmost layer and owns its own contrast insurance */
-  '.dip-label{position:relative;z-index:2;white-space:nowrap}',
+  /* contained light: the aurora never leaves the pill */
+  '.dip-aurora{position:absolute;inset:0;border-radius:999px;pointer-events:none;z-index:0;',
+  'opacity:.85;transition:opacity .3s;background:' + AURORA + '}',
 
-  /* ---------- idle -> hover: solid plate, crisp border, tight shadow ---------- */
-  '.dip-btn:hover:not(:disabled){',
-  'background:var(--dsw-alias-bg-elevated,var(--dsw-alias-bg-base));',
-  'border-color:var(--dsw-alias-border-l3);color:var(--dsw-alias-label-primary);',
-  // a 1px top sheen + a 10px coloured shadow: light without fog
-  'box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 4px 10px -6px rgba(43,108,255,.55);',
-  'transform:translateY(-1px)}',
-
-  '.dip-seat:hover .dip-spark{opacity:.95;transform:translateY(-50%) scale(1.08) rotate(90deg)}',
-  '.dip-seat:hover .dip-btn:not(:disabled) .dip-icon{transform:scale(1.14) rotate(90deg);',
-  'filter:drop-shadow(0 0 3px rgba(56,189,248,.9))}',
-
-  /* travelling arc on the border band: 1px, crisp, with a 2px glow so it reads as light */
-  '.dip-btn::after{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;opacity:0;',
-  'background:conic-gradient(from var(--dip-a,0deg),rgba(56,189,248,0) 0deg,rgba(186,230,253,1) 40deg,',
-  'rgba(125,211,252,.95) 90deg,rgba(56,189,248,0) 170deg,rgba(56,189,248,0) 190deg,rgba(251,191,36,.8) 250deg,',
-  'rgba(56,189,248,0) 320deg);',
+  /* travelling rim light, masked to the 1px band */
+  '.dip-ring{position:absolute;inset:0;border-radius:999px;padding:1px;opacity:0;pointer-events:none;z-index:1;',
+  'background:conic-gradient(from 0deg,transparent 0 38%,rgba(34,211,238,.95) 56%,rgba(245,197,66,1) 72%,rgba(125,211,252,.95) 86%,transparent 100%);',
   '-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);',
   'mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);',
-  '-webkit-mask-composite:xor;mask-composite:exclude;',
-  'filter:drop-shadow(0 0 2px rgba(56,189,248,.75));',
-  'transition:opacity .25s ease;pointer-events:none}',
-  '.dip-btn:hover:not(:disabled)::after{opacity:1;animation:dip-arc ' + D.arcSlow + ' linear infinite}',
+  '-webkit-mask-composite:xor;mask-composite:exclude;transition:opacity .25s ease}',
 
-  /* ---------- press: it settles ---------- */
-  '.dip-btn:active:not(:disabled){transform:translateY(0) scale(.96);',
-  'box-shadow:inset 0 2px 5px rgba(0,0,0,.3),0 2px 6px -5px rgba(43,108,255,.7)}',
-  '.dip-seat:active .dip-spark{opacity:1;transform:translateY(-50%) scale(.86);transition-duration:.12s}',
-  '.dip-btn:active:not(:disabled)::after{opacity:1;animation-duration:1.4s}',
+  // The label is the topmost layer; the dark shadow is what keeps light glyphs crisp on the
+  // glass, the exact opposite of the mistake made for light glyphs on a light plate.
+  '.dip-label{position:relative;z-index:2;white-space:nowrap;',
+  'text-shadow:0 1px 6px rgba(4,8,18,.8),0 0 12px rgba(43,108,255,.35)}',
 
-  /* ---------- busy: the arc becomes a running ring, the icon spins ---------- */
-  '.dip-btn[data-busy="true"]{color:var(--dsw-alias-label-primary);',
-  'background:var(--dsw-alias-bg-elevated,var(--dsw-alias-bg-base));',
-  'border-color:rgba(56,189,248,.55);',
-  'box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 4px 12px -6px rgba(43,108,255,.7)}',
+  /* ---------- hover: lift, brighten, and start the rim ---------- */
+  '.dip-btn:hover:not(:disabled){transform:translateY(-1.5px) scale(1.04);filter:brightness(1.1);',
+  'box-shadow:0 0 0 1px rgba(125,211,252,.55),0 6px 26px rgba(43,108,255,.6),0 0 24px rgba(56,189,248,.45),',
+  '0 0 28px rgba(245,197,66,.26),inset 0 1px 0 rgba(255,255,255,.34),inset 0 2px 6px rgba(226,244,255,.14),',
+  'inset 0 -1px 0 rgba(245,197,66,.26),inset 0 0 18px rgba(43,108,255,.4),0 3px 8px rgba(0,0,0,.38)}',
+  '.dip-btn:hover:not(:disabled) .dip-ring{opacity:1;animation:dip-rim 2.6s linear infinite}',
+  '.dip-seat:hover .dip-aurora{opacity:1}',
+  '.dip-seat:hover .dip-spark{opacity:.9;transform:translateY(-50%) scale(1.12) rotate(90deg)}',
+  '.dip-seat:hover .dip-icon{transform:scale(1.18) rotate(-6deg)}',
 
-  '.dip-btn[data-busy="true"]::after{opacity:1;animation:dip-arc ' + D.arcFast + ' linear infinite}',
-  '.dip-btn[data-busy="true"] .dip-icon{animation:dip-icon-spin ' + D.iconSpin + ' linear infinite;',
-  'filter:drop-shadow(0 0 3px rgba(56,189,248,.9))}',
-  '.dip-seat[data-busy="true"] .dip-spark{opacity:1;animation:dip-spark-pulse ' + D.sparkPulse + ' ease-in-out infinite}',
+  /* ---------- press ---------- */
+  '.dip-btn:active:not(:disabled){transform:translateY(0) scale(.94);transition-duration:.06s;filter:brightness(.98)}',
+  '.dip-seat:active .dip-icon{transform:scale(.9)}',
+  '.dip-btn:active:not(:disabled) .dip-ring{opacity:1;animation-duration:1.1s}',
 
-  /* ---------- states that must stay quiet ---------- */
-  '.dip-btn:focus-visible{box-shadow:0 0 0 2px var(--dsw-alias-border-l3)}',
-  // Disabled still has to be readable: WCAG exempts inactive controls, this plugin's hard
-  // requirement does not, so the text stays on label-secondary with a light dim (measured
-  // 6.15:1 dark / 4.90:1 light) while the missing light carries the signal.
-  '.dip-btn:disabled{color:var(--dsw-alias-label-secondary);cursor:default;opacity:.82}',
-  '.dip-btn:disabled::after{content:none}',
-  '.dip-seat:has(.dip-btn:disabled) .dip-spark{opacity:.2;animation:none;transform:translateY(-50%) scale(.82)}',
+  /* ---------- busy: the rim runs continuously ---------- */
+  '.dip-btn[data-busy="true"] .dip-ring{opacity:1;animation:dip-rim 1.2s linear infinite}',
+  '.dip-btn[data-busy="true"] .dip-icon{animation:dip-icon-spin 1.1s linear infinite}',
+  '.dip-seat[data-busy="true"] .dip-aurora{opacity:1;animation:dip-aurora 2s ease-in-out infinite}',
+  '.dip-seat[data-busy="true"] .dip-spark{opacity:.95;animation:dip-spark-pulse 1.6s ease-in-out infinite}',
 
-  // A compact aura behind the icon only. 18px wide at left 3px ends at x=21; the label box
-  // starts at 10px padding + 14px icon + 6px gap = x=30. Nine pixels of clearance.
+  /* ---------- quiet states ---------- */
+  '.dip-btn:focus-visible{outline:2px solid rgba(125,211,252,.85);outline-offset:2px}',
+  // Disabled keeps readable ink: the plate is unchanged dark glass, only the light is gone.
+  '.dip-btn:disabled{cursor:default;color:rgba(243,247,255,.62);filter:saturate(.35) brightness(.85)}',
+  '.dip-btn:disabled .dip-ring{opacity:0}',
+  '.dip-btn:disabled .dip-aurora{opacity:.18}',
+  '.dip-seat:has(.dip-btn:disabled) .dip-spark{opacity:.14;animation:none;transform:translateY(-50%) scale(.82)}',
+  '.dip-seat:has(.dip-btn:disabled) .dip-icon{opacity:.55}',
+
+  // Generated spark, icon slot only: 3px + 18px = 21px, the label box starts at 9 + 14 + 6 = 29px
   '.dip-spark{position:absolute;left:3px;top:50%;width:18px;height:18px;transform:translateY(-50%) scale(.95);',
-  'z-index:1;background:url(' + AURA_URI + ') center/contain no-repeat;opacity:.42;pointer-events:none;',
+  'z-index:1;background:url(' + AURA_URI + ') center/contain no-repeat;opacity:.5;pointer-events:none;',
   'transition:opacity .26s ease,transform .4s cubic-bezier(.22,1,.36,1)}',
-  '.dip-icon{width:14px;height:14px;flex:none;display:block;position:relative;z-index:2;',
-  // The icon is decoration, not text, so it does not follow the label colour: a fixed
-  // cyan reads on both themes, whereas currentColor turned it near-black on the light
-  // theme and fought the generated spark behind it.
-  'color:#38bdf8;',
-  'transition:transform .26s cubic-bezier(.22,1,.36,1),filter .24s ease}',
-  '.dip-seat:hover .dip-btn:not(:disabled) .dip-icon{color:#7dd3fc}',
-  '.dip-btn[data-busy="true"] .dip-icon{color:#7dd3fc}',
-  '.dip-seat:has(.dip-btn:disabled) .dip-icon{color:var(--dsw-alias-label-dimmed)}',
+  '.dip-icon{width:15px;height:15px;flex:none;display:block;position:relative;z-index:2;color:#eaf6ff;',
+  'filter:drop-shadow(0 0 5px rgba(56,189,248,.9)) drop-shadow(0 0 10px rgba(43,108,255,.45));',
+  // the gradient itself lives inside the SVG (see components.ts); this colour is the fallback
+  'transition:transform .2s cubic-bezier(.34,1.56,.64,1),filter .24s ease}',
+  '.dip-seat:hover .dip-icon{filter:drop-shadow(0 0 6px rgba(125,211,252,.95)) drop-shadow(0 0 12px rgba(245,197,66,.4))}',
+  '.dip-btn[data-busy="true"] .dip-icon{filter:drop-shadow(0 0 6px rgba(125,211,252,.95)) drop-shadow(0 0 12px rgba(245,197,66,.45))}',
 
-  /* ---------- the mode chevron: same language, far less of it ---------- */
+  /* ---------- the mode chevron ---------- */
   '.dip-chevron{position:relative;z-index:1;height:22px;width:16px;padding:0;display:inline-flex;align-items:center;',
   'justify-content:center;cursor:pointer;background:0 0;border:0;border-radius:6px;outline:none;',
   'color:var(--dsw-alias-label-dimmed);font-size:9px;transition:background-color .15s ease,color .15s ease,transform .12s ease}',
@@ -153,16 +154,16 @@ export const css = [
   '.dip-undo:active{transform:scale(.95)}',
 
   /* ---------- keyframes ---------- */
-  '@keyframes dip-arc{from{--dip-a:0deg}to{--dip-a:360deg}}',
-  '@keyframes dip-icon-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}',
-  '@keyframes dip-spark-pulse{0%,100%{opacity:.55;transform:translateY(-50%) scale(.95)}50%{opacity:1;transform:translateY(-50%) scale(1.12)}}',
+  '@keyframes dip-rim{to{transform:rotate(360deg)}}',
+  '@keyframes dip-icon-spin{to{transform:rotate(360deg)}}',
+  '@keyframes dip-aurora{0%,100%{opacity:.7}50%{opacity:1}}',
+  '@keyframes dip-spark-pulse{0%,100%{opacity:.5;transform:translateY(-50%) scale(.95)}50%{opacity:1;transform:translateY(-50%) scale(1.15)}}',
 
   /* ---------- motion preferences: light freezes, legibility is untouched ---------- */
   '@media (prefers-reduced-motion: reduce){',
-  '.dip-spark,.dip-btn,.dip-btn::after,.dip-icon,.dip-chevron,.dip-undo{animation:none!important;',
+  '.dip-btn,.dip-ring,.dip-aurora,.dip-spark,.dip-icon,.dip-chevron,.dip-undo{animation:none!important;',
   'transition-duration:.01ms!important}',
-  '.dip-btn:hover:not(:disabled)::after,.dip-btn[data-busy="true"]::after{opacity:1}',
-  '.dip-seat:hover .dip-spark{opacity:.95;transform:translateY(-50%) scale(1.08) rotate(90deg)}',
-  '.dip-seat[data-busy="true"] .dip-spark{opacity:.9}',
+  '.dip-btn:hover:not(:disabled) .dip-ring,.dip-btn[data-busy="true"] .dip-ring{opacity:1}',
+  '.dip-seat[data-busy="true"] .dip-aurora{opacity:1}',
   '}',
 ].join('\n')

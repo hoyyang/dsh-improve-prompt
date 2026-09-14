@@ -63,51 +63,58 @@ No preview-and-compare panel, no voice input, no self-updater, no multi-stage LL
 
 
 
-## Button design and interaction
+## Button design and interaction (v5.1)
 
 ![four states x both themes, rendered from the real CSS and the real DOM](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/button-states.png)
 
-**The principle: crisp geometry first, light second.** A 28px control lives in a dense toolbar, and a wide glow there just fogs the row. The first two revisions of this button both failed that way - one had nothing but a hairline border and no material, the next put a broad bloom behind the pill and clouded the whole composer row. The rule now: **the pill is a precision object, and every light source is contained inside it.**
+**The principle: crisp geometry first, light second — and every light source contained inside the pill.**
 
-| Layer | Treatment |
-|---|---|
-| **Plate** | Ghost at rest, matching its neighbours; from hover on it becomes a solid theme surface with a 1px top sheen, a crisp 1px border and a shadow no larger than 10px - lift without spill |
-| **Border light** | A 1px conic gradient travels the border band with only a 2px `drop-shadow`, so it reads as light moving along the edge - not an outline, not fog |
-| **Icon** | Inline SVG in a **fixed cyan** (decoration does not follow the label colour, or it turns near-black on the light theme and fights the spark behind it) with a tight 3px glow; it scales to 1.14 and turns 90 degrees on hover, and spins while busy |
-| **Spark** | The generated four-point sprite at 18px in the icon slot, as the icon aura; its box (3 + 18 = 21px) ends 9px before the label box starts at 30px |
-| **Label** | Topmost, theme colour, and deliberately **without a text-shadow**: the measured plate contrast is 13.74:1 without one, and a dark shadow behind dark glyphs smears into a grey halo on the light theme |
+The first two revisions both read "cooler" as "more light": one had a hairline border and no material, the next put a wide bloom behind the pill and fogged the whole composer row (on a 28px control, a large glow is fog).
+
+The revision after that changed the yardstick: **the plugin in the same toolbar that gets this right is dsh-plan-board.** Measuring against it produced concrete gaps — and the fix borrowed its **craft, not its palette**:
+
+| Craft learned from the reference | What was wrong here | Now |
+|---|---|---|
+| The plate is **always dark glass** and never inverts per theme | On the light theme, white plate + cyan icon + cyan rim collapsed into a wash of cyan | Deep navy glass (`#061024 -> #0c2144`), the same plate in both themes, near-white ink on top |
+| The rim must be **width-independent** | A 112-degree linear ramp only reached its first quarter on a 66px chip — violet and magenta never appeared at all, which is exactly what measuring against the reference showed | A `conic-gradient` around the pill, so every hue of this palette is always present |
+| **Aurora lives inside** the pill, not outside it | Light escaped the pill and fogged the row | Four radial pools at `inset:0`, clipped by `overflow:hidden` |
+| The icon **carries colour** | A pale star | The sparkle SVG is filled with this palette's own cyan-to-gold gradient (safe because the plate is always dark) |
+
+**The palette is this plugin's own** — cyan (`#22d3ee`) to electric blue (`#2b6cff`) with a gold accent (`#f5c542`), the same family as the project banner — and a test asserts that none of the reference's violet/magenta hues are used.
+
+Three material details make the glass read as glass: a **specular band along the top edge**, **warm gold catching the lower edge**, and **a dark body between the light pools**. The last one came out of comparing against a generated art-direction benchmark: with pools too large or too saturated, the chip reads as blue jelly rather than glass.
 
 | State | Treatment |
 |---|---|
-| **Idle** | Ghost pill plus a soft cyan spark |
-| **Hover** | Solid plate, the border light starts travelling, the icon grows and turns 90 degrees, a 1px lift |
-| **Press** | Settles to `scale(.96)` with a deeper inner shadow and a faster border light |
-| **Busy** | The border light becomes a running ring, the icon spins, the spark pulses |
-| **Disabled / focus** | Spark and border light extinguished, icon dimmed; `focus-visible` keeps a keyboard ring |
-| **Reduced motion** | Every animation stops under `prefers-reduced-motion` - motion only, never legibility |
+| **Idle** | Dark glass chip, full gradient rim, one cyan pool at the icon |
+| **Hover** | Lifts 1.5px, scales 1.04, the rim brightens, the pools brighten, the narrow outer halo strengthens |
+| **Press** | Settles to `scale(.94)`, brightness pulls back, the rim speeds up |
+| **Busy** | The rim becomes a running ring, the icon spins, the pools breathe |
+| **Disabled / focus** | Desaturated and dimmed, rim extinguished; `focus-visible` keeps a keyboard ring |
+| **Reduced motion** | Every animation stops under `prefers-reduced-motion` — motion only, never legibility |
 
-### The hard requirement: the label is always crisp
+### The hard requirement: the label is always crisp (measured in pixels)
 
-Not "it looks fine at 60% opacity" - **structural guarantees plus machine measurement**:
+1. **No light source ever sits under the glyphs.** The spark is confined to the icon slot with 9px of clearance; the rotating rim is masked to the 1px border band; and the pill is `overflow:hidden`, so no contained layer can escape.
+2. **The plate is never translucent**, so the contrast holds in every state and both themes — no "opaque only when lit" special case is needed.
+3. **Measured** — the ratio comes from the **pixels of 3x screenshots**, because the plate is a gradient and computed colours cannot answer for it:
 
-1. **No light source ever sits under the glyphs.** The generated sprite is confined to the icon slot with 9px of clearance; the border light is masked to the 1px band and can never reach the padding box; and nothing glows outside the pill at all.
-2. **A lit pill is an opaque pill.** Whenever the border light is on (hover, press, busy) the plate is a solid theme surface.
-3. **Measured** - `npm run harness:button` builds a self-checking page that asserts, per state:
+| State | Dark theme | Light theme |
+|---|---|---|
+| Idle | 11.07:1 | 11.07:1 |
+| Hover | 9.89:1 | 15.28:1 |
+| Press | 8.77:1 | 14.53:1 |
+| Busy | 9.13:1 | 15.43:1 |
 
-| State | Contrast | Plate | Spark over text | Label inside padding box |
-|---|---|---|---|---|
-| dark idle | 8.67:1 | clear | no | yes |
-| dark hover / press | 13.74:1 | **solid** | no | yes |
-| dark busy | 13.74:1 | **solid** | no | yes |
-| dark disabled | 6.15:1 | clear | no | yes |
-| light idle | 7.86:1 | clear | no | yes |
-| light hover / press | 13.74:1 | **solid** | no | yes |
-| light busy | 16.74:1 | **solid** | no | yes |
-| light disabled | **4.90:1** | clear | no | yes |
+Worst case **8.77:1** (WCAG AA wants >= 4.5:1 for body text). Disabled is measured too: WCAG exempts inactive controls, this plugin's requirement does not.
 
-Worst case **4.90:1** (WCAG AA wants >= 4.5:1 for body text) - every state passes. Disabled is measured too: WCAG exempts inactive controls, this plugin requirement does not, so the disabled colour moved from `label-dimmed` to `label-secondary` with `opacity:.82` (it was 2.63:1 before).
+### How the art was reviewed (reproducible)
 
-The self-check computes the **effective foreground** - folding in group opacity up the ancestor chain, otherwise the disabled `.82` would be silently ignored and the reported ratio would be optimistic - applies the WCAG relative-luminance formula, and asserts that the spark box never intersects the label box, that the label stays inside the pill padding box, and that a lit pill has a solid plate.
+1. `npm run harness:button` builds a comparison page with **this button next to the real dsh-plan-board button** (its CSS and DOM extracted verbatim from its source), same background, same scale;
+2. the image-prompt style library (`product-commerce-visual`) supplies the material-benchmark prompt, and dsh-image-gen renders a glass-chip detail study **in this palette** as the yardstick for how good the finish should be;
+3. comparing the three, the craft gaps were closed one by one (top specular / lower gold edge / tighter pools / keep the body dark) and the pixel contrast was re-measured.
+
+That loop caught two real defects on the spot: **a linear rim gradient showing only its first quarter on a narrow chip**, and **pools so large the chip read as blue jelly**.
 
 ## Typical scenes
 
