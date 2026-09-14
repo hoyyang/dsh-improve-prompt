@@ -32,8 +32,6 @@ dsh plugin --profile web remove dsh-improve-prompt   # uninstall
 
 ## What it does
 
-![the button in four states](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/button-states.png)
-
 - **One-click replace** — press ✦, and 1–3 seconds later the draft has become a sharper, agent-ready prompt. No preview dialog, no interruption (the WorkBuddy shape).
 - **One-click undo** — a status bar appears above the composer; press Undo within 8 seconds to restore the original. The moment you edit by hand the bar disappears, so your new input is never overwritten.
 - **Fidelity gate (the real difference)** — it mechanically extracts the draft's **hard facts**: file paths, file names, identifiers, numbers and versions, URLs, `backticked` code, @references. Each one is then verified to have literally survived the rewrite. A missing fact triggers one **repair call** naming those exact strings; if the model still drops it, a **deterministic re-append** adds a "Preserved original details" block. **Every other enhancer in the ecosystem just asks the model, in its system prompt, to "preserve the original details" — none of them checks.**
@@ -63,58 +61,33 @@ No preview-and-compare panel, no voice input, no self-updater, no multi-stage LL
 
 
 
-## Button design and interaction (v5.1)
+## Button design and interaction
 
-![four states x both themes, rendered from the real CSS and the real DOM](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/button-states.png)
+![four states x both themes, from the real CSS and the real DOM](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/button-states.png)
 
-**The principle: crisp geometry first, light second — and every light source contained inside the pill.**
-
-The first two revisions both read "cooler" as "more light": one had a hairline border and no material, the next put a wide bloom behind the pill and fogged the whole composer row (on a 28px control, a large glow is fog).
-
-The revision after that changed the yardstick: **the plugin in the same toolbar that gets this right is dsh-plan-board.** Measuring against it produced concrete gaps — and the fix borrowed its **craft, not its palette**:
-
-| Craft learned from the reference | What was wrong here | Now |
-|---|---|---|
-| The plate is **always dark glass** and never inverts per theme | On the light theme, white plate + cyan icon + cyan rim collapsed into a wash of cyan | Deep navy glass (`#061024 -> #0c2144`), the same plate in both themes, near-white ink on top |
-| The rim must be **width-independent** | A 112-degree linear ramp only reached its first quarter on a 66px chip — violet and magenta never appeared at all, which is exactly what measuring against the reference showed | A `conic-gradient` around the pill, so every hue of this palette is always present |
-| **Aurora lives inside** the pill, not outside it | Light escaped the pill and fogged the row | Four radial pools at `inset:0`, clipped by `overflow:hidden` |
-| The icon **carries colour** | A pale star | The sparkle SVG is filled with this palette's own cyan-to-gold gradient (safe because the plate is always dark) |
-
-**The palette is this plugin's own** — cyan (`#22d3ee`) to electric blue (`#2b6cff`) with a gold accent (`#f5c542`), the same family as the project banner — and a test asserts that none of the reference's violet/magenta hues are used.
-
-Three material details make the glass read as glass: a **specular band along the top edge**, **warm gold catching the lower edge**, and **a dark body between the light pools**. The last one came out of comparing against a generated art-direction benchmark: with pools too large or too saturated, the chip reads as blue jelly rather than glass.
+**Crisp geometry first, light second, and every light source contained inside the pill** (which clips with `overflow:hidden`). The plate is **dark navy glass in both themes** and never inverts; the rim is a width-independent `conic-gradient`; the palette is this plugin's own cyan -> electric blue -> gold (the banner family).
 
 | State | Treatment |
 |---|---|
-| **Idle** | Dark glass chip, full gradient rim, one cyan pool at the icon |
-| **Hover** | Lifts 1.5px, scales 1.04, the rim brightens and turns slowly (3.4s per lap), the pools brighten, the narrow halo strengthens; no bar, no breath, no comet tail |
-| **Press** | Settles to `scale(.94)`, brightness pulls back, the rim speeds up |
-| **Busy** | **Deliberately unlike hover**: the rim becomes a long-tailed **comet**, a **sweeping energy bar** runs along the bottom edge (indeterminate progress), the whole chip **charges** (scale 1 -> 1.028), the icon spins and the pools breathe |
-| **Disabled / focus** | Desaturated and dimmed, rim extinguished; `focus-visible` keeps a keyboard ring |
-| **Reduced motion** | Every animation stops under `prefers-reduced-motion` — motion only, never legibility |
+| Idle | Dark glass chip, full gradient rim, one cyan pool at the icon |
+| Hover | Lifts 1.5px, scales 1.04, the rim brightens and laps slowly (3.4s) |
+| Press | Settles to `scale(.94)`, brightness pulls back, the rim speeds up |
+| **Busy** | **Deliberately unlike hover**: a 2px long-tailed **comet** rim, a **sweeping energy bar** on the bottom edge, the whole chip **charging**, the icon spinning |
+| Disabled / focus | Desaturated and dimmed, rim extinguished; `focus-visible` keeps a ring |
+| Reduced motion | Animations stop; busy falls back to a **static full-width bar** |
 
-### The hard requirement: the label is always crisp (measured in pixels)
+### Label legibility: a hard requirement, measured in pixels
 
-1. **No light source ever sits under the glyphs.** The spark is confined to the icon slot with 9px of clearance; the rotating rim is masked to the 1px border band; and the pill is `overflow:hidden`, so no contained layer can escape.
-2. **The plate is never translucent**, so the contrast holds in every state and both themes — no "opaque only when lit" special case is needed.
-3. **Measured** — the ratio comes from the **pixels of 3x screenshots**, because the plate is a gradient and computed colours cannot answer for it:
+No light source ever sits under the glyphs: the spark owns the icon slot (9px clearance), the rim is masked to the 1px border band, and the energy bar occupies only the bottom 2px (y25..27 against a label box of y8..20). The plate is never translucent, so the ratio holds in both themes and every state. Figures come from the **pixels of 3x screenshots**, because the plate is a gradient and computed colours cannot answer for it:
 
-| State | Dark theme | Light theme |
+| State | Dark | Light |
 |---|---|---|
 | Idle | 11.07:1 | 11.07:1 |
 | Hover | 9.83:1 | 15.36:1 |
 | Press | 8.77:1 | 14.53:1 |
 | Busy | 10.99:1 | 11.00:1 |
 
-Worst case **9.83:1** (WCAG AA wants >= 4.5:1 for body text). Disabled is measured too: WCAG exempts inactive controls, this plugin's requirement does not.
-
-### How the art was reviewed (reproducible)
-
-1. `npm run harness:button` builds a comparison page with **this button next to the real dsh-plan-board button** (its CSS and DOM extracted verbatim from its source), same background, same scale;
-2. the image-prompt style library (`product-commerce-visual`) supplies the material-benchmark prompt, and dsh-image-gen renders a glass-chip detail study **in this palette** as the yardstick for how good the finish should be;
-3. comparing the three, the craft gaps were closed one by one (top specular / lower gold edge / tighter pools / keep the body dark) and the pixel contrast was re-measured.
-
-That loop caught two real defects on the spot: **a linear rim gradient showing only its first quarter on a narrow chip**, and **pools so large the chip read as blue jelly**.
+Worst case **8.77:1** (WCAG AA wants >= 4.5:1); disabled is measured too. `npm run harness:button` builds a comparison page with the real dsh-plan-board button beside this one, so every claim here is reproducible.
 
 ## Typical scenes
 
