@@ -32,7 +32,7 @@ dsh plugin --profile web remove dsh-improve-prompt   # uninstall
 
 ## What it does
 
-![component styling, rendered from the plugin's real CSS](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/components.png)
+![the button in four states](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/button-states.png)
 
 - **One-click replace** — press ✦, and 1–3 seconds later the draft has become a sharper, agent-ready prompt. No preview dialog, no interruption (the WorkBuddy shape).
 - **One-click undo** — a status bar appears above the composer; press Undo within 8 seconds to restore the original. The moment you edit by hand the bar disappears, so your new input is never overwritten.
@@ -61,6 +61,46 @@ No preview-and-compare panel, no voice input, no self-updater, no multi-stage LL
 4. Read the certificate: `已增强 · 保真 5/5 · 1.0x · 2.2s`
 5. Not happy? **Undo** (within 8 seconds)
 
+
+
+## Button design and interaction
+
+![four states × both themes, rendered from the real CSS and the real DOM](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/button-states.png)
+
+The button uses layered light: two sprites (a four-point star and a thin ring) were prompted through the image-prompt style library (`brand-identity-package` / `ui-screenshot-system`) and rendered by dsh-image-gen (gpt-image-2) with prompts that **forbid any text**. The label is always drawn by code.
+
+| State | Treatment |
+|---|---|
+| **Idle** | Ghost pill plus a soft breathing star at the icon — quiet next to its neighbours |
+| **Hover** | Opaque plate, a **rotating cyan-to-gold gradient border**, the star scales and turns, the icon glows |
+| **Press** | The whole control drops to `.955`, the border spins faster, the star contracts |
+| **Busy** | An energy ring pulses around the pill while the border rotates, the star breathes and the icon spins |
+| **Disabled / focus** | Star extinguished, border removed; `focus-visible` keeps a keyboard ring |
+| **Reduced motion** | Every animation stops under `prefers-reduced-motion` — motion only, never legibility |
+
+### The hard requirement: the label is always crisp
+
+Not "it looks fine at 60% opacity" — **structural guarantees plus machine measurement**:
+
+1. **Every glow lives outside the label's box.** The ring and the star are painted behind the pill's own background (`.dip-fx` inside `.dip-seat`, pill at `z-index:1`) and the label is the topmost element in that seat (`z-index:2`). The rotating border is masked to the 1px border band, so it cannot reach the padding box.
+2. **A bright halo implies an opaque plate.** Whenever the ring is visible (busy), the pill switches to the theme's solid surface; idle keeps the ghost look precisely because its halo is off.
+3. **Measured** — `node scripts/button-harness.mjs` builds a self-checking page that asserts, per state:
+
+| State | Contrast | Plate | Halo | Star over text | Label inside padding box |
+|---|---|---|---|---|---|
+| dark idle | 8.67:1 | clear | off | no | yes |
+| dark hover | 13.74:1 | **opaque** | off | no | yes |
+| dark press | 13.74:1 | **opaque** | off | no | yes |
+| dark busy | 13.74:1 | **opaque** | **on** | no | yes |
+| dark disabled | 6.15:1 | clear | off | no | yes |
+| light idle | 7.86:1 | clear | off | no | yes |
+| light hover / press | 13.74:1 | **opaque** | off | no | yes |
+| light busy | 16.74:1 | **opaque** | **on** | no | yes |
+| light disabled | 4.90:1 | clear | off | no | yes |
+
+Worst case **4.90:1** (WCAG AA wants ≥ 4.5:1 for body text) — every state passes. Disabled is measured too: WCAG exempts inactive controls, this plugin's requirement does not, so the disabled colour moved from `label-dimmed` to `label-secondary` with `opacity:.82` (it was 2.63:1 before).
+
+The self-check computes the **effective foreground** — folding in group opacity up the ancestor chain, otherwise the disabled `.82` would be silently ignored and the reported ratio would be optimistic — then applies the WCAG relative-luminance formula, and asserts that the star's box never intersects the label's box, that the label stays inside the pill's padding box, and that a visible halo implies an opaque plate.
 
 ## Typical scenes
 
@@ -195,7 +235,7 @@ The host half is one loopback route plus the orchestrator; the browser half regi
 
 Everything below was actually run before publishing:
 
-1. **86 tests, all green** — pure functions (hard-fact extraction / fidelity checking / length judgement / context trigger / output normalization / session history / slash-command splitting) plus **full orchestration against a stub model** (repair pass, re-append, refusal, timeout, cancellation, upstream failure, injection defence) plus the **built client bundle** (registration contract, disabled states, click-to-write-back, failure leaving the draft untouched, undo, mode memory, localization and fallback).
+1. **88 tests, all green** — pure functions (hard-fact extraction / fidelity checking / length judgement / context trigger / output normalization / session history / slash-command splitting) plus **full orchestration against a stub model** (repair pass, re-append, refusal, timeout, cancellation, upstream failure, injection defence) plus the **built client bundle** (registration contract, disabled states, click-to-write-back, failure leaving the draft untouched, undo, mode memory, localization and fallback).
 2. **Strict TypeScript checks** pass for both halves (`npm run typecheck` and `typecheck:client`).
 3. **Cold-start three-failure static check green**: link-dependency junction, bundle manifest, disabled-state contradiction — plus a clean `dsh --dump-config` composition check.
 4. **Uninstall verified clean**: route unregistered, junction removed, zero profile-manifest residue, loader entry and client module table cleared.
@@ -224,7 +264,7 @@ Everything below was actually run before publishing:
 pnpm install
 npm run build          # host: tsc → lib/
 npm run build:client   # client: tsdown → lib/client.js (window.__ModuleLoader__ format)
-npm test               # 86 tests
+npm test               # 88 tests
 npm run typecheck && npm run typecheck:client
 ```
 

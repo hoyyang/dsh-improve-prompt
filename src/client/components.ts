@@ -150,18 +150,32 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
     : commandOnly ? t('commandOnlyTitle') : split.command !== '' ? t('buttonTitleCommand') : t('buttonTitle')
   const modeLabel = mode === 'light' ? t('modeLight') : t('modeStandard')
 
+  const isDisabled = !busy && (blocked || actions === null)
+
+  // Layer order matters and is documented in styles.ts: the FX layer sits BEHIND the
+  // pill's own background, so the aura and the ring can only glow around the label,
+  // never through it. The label is the topmost element in the seat.
   return React.createElement('div', { className: 'dip-root' },
+    React.createElement('span', {
+      className: 'dip-seat',
+      'data-busy': busy ? 'true' : 'false',
+    },
+    React.createElement('span', { className: 'dip-fx', 'aria-hidden': 'true' },
+      React.createElement('span', { className: 'dip-halo' }),
+    ),
     React.createElement('button', {
       type: 'button',
       className: 'dip-btn',
-      disabled: !busy && (blocked || actions === null),
+      disabled: isDisabled,
       'data-busy': busy ? 'true' : 'false',
       'aria-label': t('buttonAria'),
       title,
       onClick,
     },
+    React.createElement('span', { className: 'dip-spark', 'aria-hidden': 'true' }),
     Sparkle(),
-    React.createElement('span', null, modeLabel),
+    React.createElement('span', { className: 'dip-label' }, modeLabel),
+    ),
     ),
     React.createElement('button', {
       type: 'button',

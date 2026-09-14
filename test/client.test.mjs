@@ -298,6 +298,45 @@ test('a cancellation aborts the in-flight request instead of writing anything', 
   }
 })
 
+test('the label is the topmost layer and no effect layer can blend over it', async () => {
+  const { button } = await boot()
+  const renderer = await mount(button, seatProps())
+
+  // structure: an FX layer behind the pill, a spark beside the icon, the label on top
+  const seat = renderer.root.findAllByProps({ className: 'dip-seat' })
+  const fx = renderer.root.findAllByProps({ className: 'dip-fx' })
+  const halo = renderer.root.findAllByProps({ className: 'dip-halo' })
+  const spark = renderer.root.findAllByProps({ className: 'dip-spark' })
+  const label = renderer.root.findAllByProps({ className: 'dip-label' })
+  assert.equal(seat.length, 1)
+  assert.equal(fx.length, 1)
+  assert.equal(halo.length, 1)
+  assert.equal(spark.length, 1)
+  assert.equal(label.length, 1)
+  // the FX layer must be aria-hidden decoration, never content
+  assert.equal(fx[0].props['aria-hidden'], 'true')
+  assert.equal(spark[0].props['aria-hidden'], 'true')
+  // and it must be a sibling that precedes the pill, so it paints behind it
+  const children = seat[0].children.map((c) => (typeof c === 'string' ? c : c.props.className))
+  assert.deepEqual(children, ['dip-fx', 'dip-btn'])
+})
+
+test('the stylesheet keeps the guarantees the legibility check relies on', async () => {
+  const fs = await import('node:fs')
+  const css = fs.readFileSync(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
+  // a blend mode on the FX layer would composite against the seat's isolated group
+  // instead of the page, which is what previously washed the glow to grey
+  assert.ok(!/mix-blend-mode/.test(css), 'no blend modes on the FX layer')
+  // the label owns a stacking level above every effect layer
+  assert.match(css, /\.dip-label\{position:relative;z-index:2/)
+  // a visible halo must imply an opaque plate, in the markup the CSS keys on
+  assert.match(css, /\.dip-btn\[data-busy="true"\]\{[^}]*background:var\(--dsw-alias-bg-elevated/)
+  // the halo is busy-only, so idle and hover never risk the label
+  assert.match(css, /\.dip-halo\{[^}]*opacity:0/)
+  // motion preferences never touch legibility, only movement
+  assert.match(css, /prefers-reduced-motion: reduce/)
+})
+
 test('the injected stylesheet is scoped by a plugin data attribute', async () => {
   const source = await import('node:fs').then((fs) => fs.readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8'))
   assert.match(source, /data-plugin/)

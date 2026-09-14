@@ -32,7 +32,7 @@ dsh plugin --profile web remove dsh-improve-prompt   # 卸载
 
 ## 有啥用
 
-![组件样式实测渲染](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/components.png)
+![按钮四态实拍](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/button-states.png)
 
 - **一键直替** — 点 ✦，1–3 秒后草稿被替换成更清晰、更贴 Agent 执行的版本。不弹预览、不打断你（对齐 WorkBuddy 的形态）。
 - **一键撤回** — 替换后输入框上方出现状态条，8 秒内点「撤回」恢复原文；你一旦手动编辑，状态条自动消失，绝不覆盖你的新输入。
@@ -61,6 +61,46 @@ dsh plugin --profile web remove dsh-improve-prompt   # 卸载
 4. 看状态条：`已增强 · 保真 5/5 · 1.0x · 2.2s`
 5. 不满意 → 「撤回」（8 秒内）
 
+
+
+## 按钮视觉与交互
+
+![四种状态 × 明暗主题（真实 CSS + 真实 DOM 渲染）](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/button-states.png)
+
+按钮用**生成的光效素材 + 代码叠加文字**的分层做法：星芒与光环两张雪碧图由 image-prompt（风格库 `brand-identity-package` / `ui-screenshot-system`）出提示词、dsh-image-gen（gpt-image-2）生成，提示词**禁止任何文字**；按钮文字始终由代码绘制。
+
+| 状态 | 表现 |
+|---|---|
+| **闲置** | 幽灵药丸 + 图标处一枚呼吸感星芒（不打扰相邻控件） |
+| **悬停** | 药丸转为不透明底板、出现 **cyan→金 的旋转渐变描边**、星芒放大旋转、图标辉光 |
+| **点按** | 整体缩到 `.955`、描边加速、星芒收束（有落感） |
+| **进行中** | 外圈能量环脉动 + 描边旋转 + 星芒呼吸 + 图标自转 |
+| **禁用 / 焦点** | 星芒熄灭、描边移除；`focus-visible` 保留键盘焦点环 |
+| **降低动效** | `prefers-reduced-motion` 下所有动画停止，**只停动效、不动清晰度** |
+
+### 硬性约束：文字必须始终清晰可读
+
+不是靠调透明度"看起来还行"，而是**结构上保证 + 机器测量**：
+
+1. **光效全部在文字盒之外**：光环与星芒画在药丸自身背景**之下**（`.dip-fx` 在 `.dip-seat` 内、药丸 `z-index:1`），文字 `.dip-label` 是 seat 内最高层（`z-index:2`）；旋转描边用 `mask-composite` 只占 1px 边框带，永远进不了内边距区。
+2. **亮光晕 ⇒ 不透明底板**：只要光环可见（进行中），药丸背景必然切成主题实色底板；闲置态光环关闭，才保留幽灵外观。
+3. **实测**（`node scripts/button-harness.mjs` 产出可自检页面，页面内置断言）：
+
+| 状态 | 对比度 | 底板 | 光环 | 星芒压字 | 文字在内边距内 |
+|---|---|---|---|---|---|
+| dark 闲置 | 8.67:1 | 透明 | 关 | 否 | 是 |
+| dark 悬停 | 13.74:1 | **不透明** | 关 | 否 | 是 |
+| dark 点按 | 13.74:1 | **不透明** | 关 | 否 | 是 |
+| dark 进行中 | 13.74:1 | **不透明** | **开** | 否 | 是 |
+| dark 禁用 | 6.15:1 | 透明 | 关 | 否 | 是 |
+| light 闲置 | 7.86:1 | 透明 | 关 | 否 | 是 |
+| light 悬停/点按 | 13.74:1 | **不透明** | 关 | 否 | 是 |
+| light 进行中 | 16.74:1 | **不透明** | **开** | 否 | 是 |
+| light 禁用 | 4.90:1 | 透明 | 关 | 否 | 是 |
+
+最差 **4.90:1**（WCAG AA 正文要求 ≥4.5:1），全部状态通过。禁用态也照测——WCAG 豁免非活性控件，但本插件的约束不豁免，所以把禁用色从 `label-dimmed` 换成 `label-secondary` + `opacity:.82`（原为 2.63:1，不达标）。
+
+自我校验由页面内脚本完成：计算每个状态的**有效前景**（把祖先链上的组不透明度折算进去，否则禁用态的 `.82` 会被忽略、报出偏高的数字）、按 WCAG 相对亮度算比值，并断言"星芒盒与文字盒不相交""文字盒在药丸内边距内""可见光环 ⇒ 不透明底板"。
 
 ## 典型场景
 
@@ -195,7 +235,7 @@ composer 草稿
 
 发布前跑过的验证，逐条都是实跑结果：
 
-1. **86 个单测全绿** —— 纯函数（硬事实抽取 / 保真校验 / 长度判定 / 上下文判定 / 输出规范化 / 会话历史 / 斜杠命令切分）＋ 用 stub 模型驱动的**完整编排**（修复轮、回灌、拒绝、超时、取消、上游异常、注入防护）＋ **加载真实 client bundle** 的界面行为（注册契约 / 禁用态 / 点击回填 / 失败不动草稿 / 撤回 / 档位记忆 / 本地化与回退）。
+1. **88 个单测全绿** —— 纯函数（硬事实抽取 / 保真校验 / 长度判定 / 上下文判定 / 输出规范化 / 会话历史 / 斜杠命令切分）＋ 用 stub 模型驱动的**完整编排**（修复轮、回灌、拒绝、超时、取消、上游异常、注入防护）＋ **加载真实 client bundle** 的界面行为（注册契约 / 禁用态 / 点击回填 / 失败不动草稿 / 撤回 / 档位记忆 / 本地化与回退）。
 2. **host / client 双 TypeScript 严格检查**通过（`npm run typecheck` 与 `typecheck:client`）。
 3. **冷启动三故障静态检测全绿**：link 依赖 junction、bundle manifest、disabled 状态矛盾；外加 `dsh --dump-config` 组合复检无错误。
 4. **卸载即净实测**：路由注销、junction 删除、profile 清单零残留、loader entry 与 client 模块表清理。
@@ -224,7 +264,7 @@ composer 草稿
 pnpm install
 npm run build          # host: tsc → lib/
 npm run build:client   # client: tsdown → lib/client.js（window.__ModuleLoader__ 格式）
-npm test               # 86 个单测
+npm test               # 88 个单测
 npm run typecheck && npm run typecheck:client
 ```
 
