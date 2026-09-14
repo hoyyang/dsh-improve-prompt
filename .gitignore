@@ -1,0 +1,7 @@
+node_modules/
+*.tsbuildinfo
+*.tgz
+.DS_Store
+
+# NOTE: lib/ is intentionally COMMITTED — dsh plugin add github:<repo> installs the
+# prebuilt host half and client bundle without running a build.

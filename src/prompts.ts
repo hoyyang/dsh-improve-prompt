@@ -1,0 +1,107 @@
+/**
+ * External prompt loading: behaviour lives in `prompts/*.md`, not in code, so a
+ * user can retune the plugin without touching TypeScript.
+ *
+ * Resolution order per file: `$DSH_HOME/dsh-improve-prompt/prompts/<name>.md`
+ * (user override) then the packaged `prompts/<name>.md`.
+ *
+ * @module dsh-improve-prompt/prompts
+ */
+
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { dshHome, type Mode, type ResolvedConfig } from './config.js'
+
+/** Directory of the shipped prompt files (plugin root, one level above lib/). */
+function shippedDir(): string {
+  let base: string
+  try {
+    base = dirname(fileURLToPath(import.meta.url))
+  } catch {
+    base = process.cwd()
+  }
+  // Built output lives in <plugin>/lib/, sources in <plugin>/src/.
+  const pluginRoot = base.endsWith(join('', 'lib')) || base.endsWith('lib') ? dirname(base) : dirname(base)
+  return join(pluginRoot, 'prompts')
+}
+
+/** Where a user may drop their own prompt overrides. */
+export function userPromptDir(): string {
+  return join(dshHome(), 'dsh-improve-prompt', 'prompts')
+}
+
+function readPrompt(name: string, fallback: string): string {
+  const candidates = [join(userPromptDir(), name + '.md'), join(shippedDir(), name + '.md')]
+  for (const candidate of candidates) {
+    try {
+      const text = readFileSync(candidate, 'utf8')
+      if (text.trim() !== '') return text.trim()
+    } catch { /* try the next candidate */ }
+  }
+  return fallback
+}
+
+/** Minimal built-in fallbacks: the plugin still works if the .md files are missing. */
+const FALLBACK_DISCIPLINE = [
+  'You rewrite one draft prompt for an AI coding agent. Output ONLY the rewritten prompt.',
+  'Preserve the user intent exactly; add no requirements the user did not state; lose no detail.',
+  'Write the rewrite in the same language as the draft. Do not answer the request.',
+].join('\n')
+
+const FALLBACK_MODES: Record<Mode, string> = {
+  light: 'Mode: light. Clean up filler, typos and redundancy. Do not restructure. At most ~1.2x the draft.',
+  standard: 'Mode: standard. Restate the request so an agent can execute it: deliverable, constraints, steps, format. Add nothing new. At most ~2.5x the draft.',
+}
+
+/** The always-loaded discipline layer. */
+export function disciplinePrompt(): string {
+  return readPrompt('discipline', FALLBACK_DISCIPLINE)
+}
+
+/** One mode's template. */
+export function modePrompt(mode: Mode): string {
+  return readPrompt(mode, FALLBACK_MODES[mode])
+}
+
+/** The acceptance-criteria clause, appended to standard mode when enabled. */
+const ACCEPTANCE_CLAUSE = [
+  '',
+  'Additionally, when the draft implies a code change, add a short acceptance section stating how',
+  'the result will be verified: the concrete check to run, and what "correct" looks like.',
+  'Only state checks that follow from the draft — never invent a test framework or command the',
+  'draft does not imply.',
+].join('\n')
+
+/**
+ * Assemble the system prompt for one call.
+ *
+ * @param mode - active mode.
+ * @param config - resolved configuration.
+ * @returns the system prompt text.
+ */
+export function buildSystemPrompt(mode: Mode, config: ResolvedConfig): string {
+  const parts = [disciplinePrompt(), modePrompt(mode)]
+  if (mode === 'standard' && config.acceptanceCriteria) parts.push(ACCEPTANCE_CLAUSE)
+  return parts.join('\n\n')
+}
+
+/** Neutralize a literal closing tag so the draft cannot break out of its frame. */
+function escapeClosingTag(text: string): string {
+  return text.replace(/<\/?(raw_prompt|conversation_context)>/gi, '<\\/$1>')
+}
+
+/**
+ * Frame the call's user message: optional context block, then the draft inside
+ * `<raw_prompt>` tags so user text is never mistaken for an instruction.
+ *
+ * @param draft - the user's raw draft.
+ * @param contextBlock - rendered history block, or ''.
+ * @param extraClause - a repair instruction, or ''.
+ * @returns the user message body.
+ */
+export function buildUserMessage(draft: string, contextBlock: string, extraClause: string): string {
+  const safe = escapeClosingTag(draft)
+  const head = contextBlock !== '' ? contextBlock + '\n\n' : ''
+  return 'Rewrite the following prompt:\n' + head + '<raw_prompt>\n' + safe + '\n</raw_prompt>' + (extraClause !== '' ? '\n' + extraClause : '')
+}

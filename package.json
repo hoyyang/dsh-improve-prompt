@@ -1,0 +1,85 @@
+{
+  "name": "dsh-improve-prompt",
+  "version": "0.1.0",
+  "description": "一键把输入框草稿改写为更清晰、更贴 Agent 执行的提示词：直接替换 + 一键撤回，带保真闸与长度闸。",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/types/index.d.ts",
+  "files": [
+    "lib",
+    "prompts",
+    "cordis.patch.yml",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "author": "hoyyang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hoyyang/dsh-improve-prompt.git"
+  },
+  "homepage": "https://github.com/hoyyang/dsh-improve-prompt#readme",
+  "bugs": {
+    "url": "https://github.com/hoyyang/dsh-improve-prompt/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "prompt-engineering",
+    "prompt-enhancement"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": ">=0.1.0-rc <2",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.1.0-rc <2",
+    "cordis": ">=4.0.0-rc <5",
+    "schemastery": "^3.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "~18.3.1",
+    "@types/react-dom": "~18.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-test-renderer": "^18.3.1",
+    "tsdown": "^0.22.14",
+    "typescript": "^5.9.0",
+    "unrun": "^0.3.1"
+  },
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "build:client": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "npm run build && npm run build:client && npm test",
+    "typecheck:client": "tsc -p tsconfig.client.json --noEmit"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  }
+}
