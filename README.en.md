@@ -65,42 +65,49 @@ No preview-and-compare panel, no voice input, no self-updater, no multi-stage LL
 
 ## Button design and interaction
 
-![four states × both themes, rendered from the real CSS and the real DOM](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/button-states.png)
+![four states x both themes, rendered from the real CSS and the real DOM](https://raw.githubusercontent.com/hoyyang/dsh-improve-prompt/main/assets/button-states.png)
 
-The button uses layered light: two sprites (a four-point star and a thin ring) were prompted through the image-prompt style library (`brand-identity-package` / `ui-screenshot-system`) and rendered by dsh-image-gen (gpt-image-2) with prompts that **forbid any text**. The label is always drawn by code.
+**The principle: crisp geometry first, light second.** A 28px control lives in a dense toolbar, and a wide glow there just fogs the row. The first two revisions of this button both failed that way - one had nothing but a hairline border and no material, the next put a broad bloom behind the pill and clouded the whole composer row. The rule now: **the pill is a precision object, and every light source is contained inside it.**
+
+| Layer | Treatment |
+|---|---|
+| **Plate** | Ghost at rest, matching its neighbours; from hover on it becomes a solid theme surface with a 1px top sheen, a crisp 1px border and a shadow no larger than 10px - lift without spill |
+| **Border light** | A 1px conic gradient travels the border band with only a 2px `drop-shadow`, so it reads as light moving along the edge - not an outline, not fog |
+| **Icon** | Inline SVG in a **fixed cyan** (decoration does not follow the label colour, or it turns near-black on the light theme and fights the spark behind it) with a tight 3px glow; it scales to 1.14 and turns 90 degrees on hover, and spins while busy |
+| **Spark** | The generated four-point sprite at 18px in the icon slot, as the icon aura; its box (3 + 18 = 21px) ends 9px before the label box starts at 30px |
+| **Label** | Topmost, theme colour, and deliberately **without a text-shadow**: the measured plate contrast is 13.74:1 without one, and a dark shadow behind dark glyphs smears into a grey halo on the light theme |
 
 | State | Treatment |
 |---|---|
-| **Idle** | Ghost pill plus a soft breathing star at the icon — quiet next to its neighbours |
-| **Hover** | Opaque plate, a **rotating cyan-to-gold gradient border**, the star scales and turns, the icon glows |
-| **Press** | The whole control drops to `.955`, the border spins faster, the star contracts |
-| **Busy** | An energy ring pulses around the pill while the border rotates, the star breathes and the icon spins |
-| **Disabled / focus** | Star extinguished, border removed; `focus-visible` keeps a keyboard ring |
-| **Reduced motion** | Every animation stops under `prefers-reduced-motion` — motion only, never legibility |
+| **Idle** | Ghost pill plus a soft cyan spark |
+| **Hover** | Solid plate, the border light starts travelling, the icon grows and turns 90 degrees, a 1px lift |
+| **Press** | Settles to `scale(.96)` with a deeper inner shadow and a faster border light |
+| **Busy** | The border light becomes a running ring, the icon spins, the spark pulses |
+| **Disabled / focus** | Spark and border light extinguished, icon dimmed; `focus-visible` keeps a keyboard ring |
+| **Reduced motion** | Every animation stops under `prefers-reduced-motion` - motion only, never legibility |
 
 ### The hard requirement: the label is always crisp
 
-Not "it looks fine at 60% opacity" — **structural guarantees plus machine measurement**:
+Not "it looks fine at 60% opacity" - **structural guarantees plus machine measurement**:
 
-1. **Every glow lives outside the label's box.** The ring and the star are painted behind the pill's own background (`.dip-fx` inside `.dip-seat`, pill at `z-index:1`) and the label is the topmost element in that seat (`z-index:2`). The rotating border is masked to the 1px border band, so it cannot reach the padding box.
-2. **A bright halo implies an opaque plate.** Whenever the ring is visible (busy), the pill switches to the theme's solid surface; idle keeps the ghost look precisely because its halo is off.
-3. **Measured** — `node scripts/button-harness.mjs` builds a self-checking page that asserts, per state:
+1. **No light source ever sits under the glyphs.** The generated sprite is confined to the icon slot with 9px of clearance; the border light is masked to the 1px band and can never reach the padding box; and nothing glows outside the pill at all.
+2. **A lit pill is an opaque pill.** Whenever the border light is on (hover, press, busy) the plate is a solid theme surface.
+3. **Measured** - `npm run harness:button` builds a self-checking page that asserts, per state:
 
-| State | Contrast | Plate | Halo | Star over text | Label inside padding box |
-|---|---|---|---|---|---|
-| dark idle | 8.67:1 | clear | off | no | yes |
-| dark hover | 13.74:1 | **opaque** | off | no | yes |
-| dark press | 13.74:1 | **opaque** | off | no | yes |
-| dark busy | 13.74:1 | **opaque** | **on** | no | yes |
-| dark disabled | 6.15:1 | clear | off | no | yes |
-| light idle | 7.86:1 | clear | off | no | yes |
-| light hover / press | 13.74:1 | **opaque** | off | no | yes |
-| light busy | 16.74:1 | **opaque** | **on** | no | yes |
-| light disabled | 4.90:1 | clear | off | no | yes |
+| State | Contrast | Plate | Spark over text | Label inside padding box |
+|---|---|---|---|---|
+| dark idle | 8.67:1 | clear | no | yes |
+| dark hover / press | 13.74:1 | **solid** | no | yes |
+| dark busy | 13.74:1 | **solid** | no | yes |
+| dark disabled | 6.15:1 | clear | no | yes |
+| light idle | 7.86:1 | clear | no | yes |
+| light hover / press | 13.74:1 | **solid** | no | yes |
+| light busy | 16.74:1 | **solid** | no | yes |
+| light disabled | **4.90:1** | clear | no | yes |
 
-Worst case **4.90:1** (WCAG AA wants ≥ 4.5:1 for body text) — every state passes. Disabled is measured too: WCAG exempts inactive controls, this plugin's requirement does not, so the disabled colour moved from `label-dimmed` to `label-secondary` with `opacity:.82` (it was 2.63:1 before).
+Worst case **4.90:1** (WCAG AA wants >= 4.5:1 for body text) - every state passes. Disabled is measured too: WCAG exempts inactive controls, this plugin requirement does not, so the disabled colour moved from `label-dimmed` to `label-secondary` with `opacity:.82` (it was 2.63:1 before).
 
-The self-check computes the **effective foreground** — folding in group opacity up the ancestor chain, otherwise the disabled `.82` would be silently ignored and the reported ratio would be optimistic — then applies the WCAG relative-luminance formula, and asserts that the star's box never intersects the label's box, that the label stays inside the pill's padding box, and that a visible halo implies an opaque plate.
+The self-check computes the **effective foreground** - folding in group opacity up the ancestor chain, otherwise the disabled `.82` would be silently ignored and the reported ratio would be optimistic - applies the WCAG relative-luminance formula, and asserts that the spark box never intersects the label box, that the label stays inside the pill padding box, and that a lit pill has a solid plate.
 
 ## Typical scenes
 

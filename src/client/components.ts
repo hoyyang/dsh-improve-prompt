@@ -152,17 +152,14 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
 
   const isDisabled = !busy && (blocked || actions === null)
 
-  // Layer order matters and is documented in styles.ts: the FX layer sits BEHIND the
-  // pill's own background, so the aura and the ring can only glow around the label,
-  // never through it. The label is the topmost element in the seat.
+  // Layer order matters and is documented in styles.ts. There is deliberately NO light
+  // layer outside the pill: every light source is contained inside it, and the label is
+  // the topmost element in the seat.
   return React.createElement('div', { className: 'dip-root' },
     React.createElement('span', {
       className: 'dip-seat',
       'data-busy': busy ? 'true' : 'false',
     },
-    React.createElement('span', { className: 'dip-fx', 'aria-hidden': 'true' },
-      React.createElement('span', { className: 'dip-halo' }),
-    ),
     React.createElement('button', {
       type: 'button',
       className: 'dip-btn',
