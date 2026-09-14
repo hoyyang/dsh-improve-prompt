@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check (host + client)
+        run: |
+          npm run typecheck
+          npm run typecheck:client
+
+      - name: Unit tests
+        run: npm test
+
+      # The host build links packages out of a local dsh installation
+      # (scripts/build.sh), which a vanilla runner does not have — so the
+      # prebuilt lib/ is what ships, and CI verifies it is present, parses, and
+      # actually imports instead of trying to rebuild it.
+      - name: Committed artifacts load
+        run: |
+          test -f lib/index.js
+          test -f lib/client.js
+          test -f cordis.patch.yml
+          test -f prompts/discipline.md
+          test -f prompts/light.md
+          test -f prompts/standard.md
+          node --check lib/client.js
+          node -e "import('./lib/index.js').then((m) => {
+            if (m.name !== 'dsh-improve-prompt') throw new Error('unexpected plugin name: ' + m.name)
+            if (typeof m.apply !== 'function') throw new Error('missing apply()')
+            if (!Array.isArray(m.inject)) throw new Error('missing inject declaration')
+            console.log('host half loads: name=' + m.name + ' inject=' + JSON.stringify(m.inject))
+          })"
+
+      - name: Manifest declares what the installer needs
+        run: |
+          node -e "
+            const p = JSON.parse(require('fs').readFileSync('package.json', 'utf8'))
+            const fail = (m) => { console.error('::error::' + m); process.exit(1) }
+            if (!p.dsh?.bundle?.patch) fail('package.json must declare dsh.bundle.patch')
+            if (!p.dsh?.client) fail('package.json must declare dsh.client for the browser half')
+            require('fs').accessSync(p.dsh.bundle.patch)
+            if (p.private === true) fail('package.json must not be private')
+            console.log('manifest OK: ' + p.name + '@' + p.version)
+          "
