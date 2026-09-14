@@ -59,6 +59,71 @@ No preview-and-compare panel, no voice input, no self-updater, no multi-stage LL
 4. Read the certificate: `已增强 · 保真 5/5 · 1.0x · 2.2s`
 5. Not happy? **Undo** (within 8 seconds)
 
+
+## Typical scenes
+
+1. **A colloquial request, said clearly once** — "帮我看看能不能把那个登录接口改得快一点，就是感觉有点慢" loses the verbal filler but keeps your own judgement ("feels slow") and does not pick an optimisation technique for you.
+2. **A request carrying paths and identifiers** — where the fidelity gate earns its keep. File paths, function names, version numbers, URLs and backticked code survive the rewrite verbatim instead of being paraphrased away.
+3. **A wordy English sentence** — Light mode compresses "I was kind of wondering if you could maybe…" into one executable English request.
+4. **A continuation draft** — you discussed an endpoint last turn and now type only "把那个接口加上限流". Smart context carries the recent turns, so the rewrite connects to the plan you already agreed on.
+5. **A mis-click or a result you dislike** — press Undo within 8 seconds. The moment you edit by hand the bar disappears, so your new input is never overwritten.
+6. **A vague draft** — something like "加个功能" is never padded into a fabricated spec: the discipline layer tells the model to leave it alone rather than invent, so you get it back unchanged.
+
+## What you will see
+
+- **Quality certificate** — the status bar: `已增强 · 保真 5/5 · 1.0x · 2.2s`
+- **Undo affordance** — the 撤回 button on the same bar, gone after 8 seconds
+- **Re-append notice** — only when the deterministic fallback fired: `已增强 · 保真 5/5 · 1.4x · 3.1s · 已回灌 src/a.ts`
+- **Preserved-details block** — appended to the rewrite on re-append: `保留原始细节 / Preserved original details:` followed by the exact strings
+- **Failure copy (draft untouched)** — "增强超时（60000ms），原文未改动" / "未找到可用模型：请先在设置里选默认模型" / "增强结果超出长度上限（…），已保留原文"
+- **Mode label** — the button shows the active mode (轻 / 标准); **⌄** switches it
+
+## Real measured examples
+
+All four were produced on a real model on this machine — none of them is a constructed demo.
+
+**① Chinese + hard facts (Standard)**
+
+```text
+in : 就是那个 帮我把 src/host/config.ts 里的 maxRatioFor 改成 2.5 呗，顺便看看 https://example.com/a?b=1 那个文档，用 `pnpm build` 验证一下
+out: 把 `src/host/config.ts` 里的 `maxRatioFor` 改成 `2.5`，同时看一下 https://example.com/a?b=1 这个文档，然后用 `pnpm build` 验证一下。
+certificate: fidelity 5/5 · 1.0x · 2.2s
+```
+
+The path, the identifier, the version, the URL and the backticked command all survive verbatim; only the noise ("就是那个", "呗") is gone.
+
+**② Wordy English (Light)**
+
+```text
+in : I was kind of wondering if you could maybe take a look at the login flow and see if there is any way we could possibly make it a bit faster, it feels slow to me
+out: Take a look at the login flow and see if there's any way we can make it faster — it feels slow to me.
+certificate: 0.6x
+```
+
+**③ Vague input (Standard) — it refuses to invent**
+
+```text
+in : 加个功能
+out: 加个功能
+certificate: 1.0x
+```
+
+The model is told not to invent requirements when the draft carries none; returning it unchanged is the correct outcome.
+
+**④ Explicit uncertainty (Standard)**
+
+```text
+in : 把那个接口加上限流
+out: 给那个接口加上限流。
+
+- 目标接口：(TBD: 具体是哪个接口/路由)
+- 限流规则（阈值与时间窗口）：(TBD: 例如每秒/每分钟允许多少次)
+- 超限后的行为：(TBD: 例如返回 429 还是拒绝/排队)
+- 除新增限流外，原有逻辑保持不变。
+```
+
+**Structure added, zero facts invented.** Gaps are marked `(TBD: …)` for you to fill, instead of guessed at.
+
 ## Advanced
 
 ### Configuration
@@ -125,12 +190,18 @@ The host half is one loopback route plus the orchestrator; the browser half regi
 
 ## Reliability and verification
 
-- **71 tests, all green**: pure functions (hard-fact extraction / fidelity checking / length judgement / context trigger / output normalization / session history), **full orchestration against a stub model** (repair pass, re-append, refusal, timeout, cancellation, upstream failure, injection defence), and the **built client bundle** (registration contract, disabled states, click-to-write-back, failure leaving the draft untouched, undo, mode memory, localization and fallback).
-- **Strict TypeScript checks** pass for both halves.
-- **Cold-start three-failure static check green** (link junction / bundle manifest / disabled contradiction) plus a clean `dsh --dump-config` composition check.
-- **Uninstall verified clean**: route unregistered, junction removed, zero profile-manifest residue, loader entry and client module table cleared; reinstalling is idempotent.
-- **Live end-to-end against a real model**: a draft carrying a path, an identifier, a version, a URL and backticked code came back at fidelity `5/5`, ratio `1.0x`; a wordy English draft in Light mode came back at `0.6x`; a vague draft ("加个功能") was returned unchanged rather than padded with invented requirements.
-- **A real design flaw was found and fixed during live testing**: a nine-character draft would have been allowed only 22 characters under a bare 2.5x ratio — refusing exactly the rewrite it needs most. Now `max(200, length × ratio)`, locked down by tests.
+Everything below was actually run before publishing:
+
+1. **71 tests, all green** — pure functions (hard-fact extraction / fidelity checking / length judgement / context trigger / output normalization / session history) plus **full orchestration against a stub model** (repair pass, re-append, refusal, timeout, cancellation, upstream failure, injection defence) plus the **built client bundle** (registration contract, disabled states, click-to-write-back, failure leaving the draft untouched, undo, mode memory, localization and fallback).
+2. **Strict TypeScript checks** pass for both halves (`npm run typecheck` and `typecheck:client`).
+3. **Cold-start three-failure static check green**: link-dependency junction, bundle manifest, disabled-state contradiction — plus a clean `dsh --dump-config` composition check.
+4. **Uninstall verified clean**: route unregistered, junction removed, zero profile-manifest residue, loader entry and client module table cleared.
+5. **Reinstall is idempotent**: a second inject reports "already active, skipping" and creates no duplicate entry.
+6. **Reverse-install acceptance**: installed from both `dsh plugin add dsh-improve-prompt` (npm) and `dsh plugin add github:hoyyang/dsh-improve-prompt` inside an isolated staging home; artifacts complete, config composition correct.
+7. **Live end-to-end against a real model**: a draft carrying a path, an identifier, a version, a URL and backticked code came back at fidelity `5/5`, `1.0x` (example ① above).
+8. **Light mode measured**: a wordy English sentence came back at `0.6x` (example ②); a vague draft came back unchanged (example ③).
+9. **Smart context measured**: the same draft reports `contextUsed: anaphora` with a session id and genuinely references the conversation; without one it reports `none` and falls back to TBD markers.
+10. **A real design flaw was found and fixed during live testing**: a nine-character draft would have been allowed only 22 characters under a bare 2.5x ratio — refusing exactly the rewrite it needs most. Now `max(200, length × ratio)`, locked down by four tests.
 
 ## FAQ
 
