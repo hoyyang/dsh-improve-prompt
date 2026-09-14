@@ -12,8 +12,35 @@
  *
  * @module dsh-improve-prompt/llm-call
  */
-import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm';
 import type { ResolvedConfig } from './config.js';
+/**
+ * The model-request shape this plugin builds, declared structurally.
+ *
+ * Deliberately not imported from `@deepseek-ai/dsh-llm`: a plugin that resolves
+ * its own copy of that package would type-check against a different version than
+ * the running host. Only the fields the harness contract documents are used.
+ */
+export interface GenerateOptions {
+    provider: string;
+    model: string;
+    system?: string;
+    messages: readonly unknown[];
+    temperature?: number;
+    maxTokens?: number;
+    signal?: AbortSignal;
+    reasoningEffort?: string;
+}
+/** One streamed chunk: only the discriminants this plugin reads are named. */
+export type StreamChunk = {
+    readonly type: 'text-delta';
+    readonly text: string;
+} | {
+    readonly type: 'tool-call-delta';
+} | {
+    readonly type: 'finish';
+} | {
+    readonly type: string;
+};
 /** The slice of `ctx.llm` this plugin uses. */
 export interface LlmFace {
     stream(options: GenerateOptions): AsyncIterable<StreamChunk>;

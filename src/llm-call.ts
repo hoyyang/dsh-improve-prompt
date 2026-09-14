@@ -13,8 +13,32 @@
  * @module dsh-improve-prompt/llm-call
  */
 
-import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { ResolvedConfig } from './config.js'
+
+/**
+ * The model-request shape this plugin builds, declared structurally.
+ *
+ * Deliberately not imported from `@deepseek-ai/dsh-llm`: a plugin that resolves
+ * its own copy of that package would type-check against a different version than
+ * the running host. Only the fields the harness contract documents are used.
+ */
+export interface GenerateOptions {
+  provider: string
+  model: string
+  system?: string
+  messages: readonly unknown[]
+  temperature?: number
+  maxTokens?: number
+  signal?: AbortSignal
+  reasoningEffort?: string
+}
+
+/** One streamed chunk: only the discriminants this plugin reads are named. */
+export type StreamChunk =
+  | { readonly type: 'text-delta'; readonly text: string }
+  | { readonly type: 'tool-call-delta' }
+  | { readonly type: 'finish' }
+  | { readonly type: string }
 
 /** The slice of `ctx.llm` this plugin uses. */
 export interface LlmFace {
@@ -63,14 +87,14 @@ let messageSeq = 0
  * @param text - the full user-message body.
  * @returns a frozen user message.
  */
-function userMessage(text: string): GenerateOptions['messages'][number] {
+function userMessage(text: string): unknown {
   messageSeq += 1
   return Object.freeze({
     id: 'dsh-improve-prompt-' + String(messageSeq),
     role: 'user',
     content: [Object.freeze({ type: 'text', text })],
     source: Object.freeze({ kind: 'user' }),
-  }) as unknown as GenerateOptions['messages'][number]
+  })
 }
 
 /**
@@ -120,7 +144,7 @@ export async function callModel(llm: LlmFace, request: CallRequest): Promise<Cal
   let text = ''
   let sawToolCall = false
   try {
-    const options = {
+    const options: GenerateOptions = {
       provider: request.route.provider,
       model: request.route.model,
       system: request.system,
@@ -128,12 +152,10 @@ export async function callModel(llm: LlmFace, request: CallRequest): Promise<Cal
       temperature: request.config.temperature,
       maxTokens: request.config.maxTokens,
       signal: controller.signal,
-    } as GenerateOptions
+    }
     // Only send a reasoning effort when the user asked for one: gateways disagree
     // on whether they accept the parameter at all.
-    if (request.config.reasoningEffort !== '') {
-      ;(options as { reasoningEffort?: string }).reasoningEffort = request.config.reasoningEffort
-    }
+    if (request.config.reasoningEffort !== '') options.reasoningEffort = request.config.reasoningEffort
 
     const iterator = llm.stream(options)[Symbol.asyncIterator]()
     let finished = false
@@ -142,7 +164,7 @@ export async function callModel(llm: LlmFace, request: CallRequest): Promise<Cal
         const step = await iterator.next()
         if (step.done === true) break
         const chunk = step.value
-        if (chunk.type === 'text-delta') text += chunk.text
+        if (chunk.type === 'text-delta') text += (chunk as { text: string }).text
         else if (chunk.type === 'tool-call-delta') sawToolCall = true
         else if (chunk.type === 'finish') finished = true
       }

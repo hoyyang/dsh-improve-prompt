@@ -16,7 +16,22 @@
  *
  * @module dsh-improve-prompt
  */
-import type { Context } from 'cordis';
+/**
+ * The slice of the Cordis host context this plugin touches.
+ *
+ * Declared structurally rather than imported: the built plugin then type-checks
+ * against nothing but TypeScript and @types/node, so a peer-package version skew
+ * can never turn into a build failure. Every member is read defensively at call
+ * time anyway (see `service()` below).
+ */
+export interface HostContext {
+    effect(fn: () => unknown | (() => void), label?: string): unknown;
+    on(event: string, listener: (...args: never[]) => unknown): unknown;
+    get(name: string): unknown;
+    logger?: {
+        warn?: (message: string) => void;
+    };
+}
 /** Cordis plugin name. */
 export declare const name = "dsh-improve-prompt";
 /** Required services: the model registry and the HTTP carrier. */
@@ -28,4 +43,4 @@ export { Config } from './config.js';
  * @param ctx - cordis context carrying `llm` and `webServer`.
  * @param rawConfig - loader-supplied configuration (all keys optional).
  */
-export declare function apply(ctx: Context, rawConfig: unknown): void;
+export declare function apply(ctx: HostContext, rawConfig: unknown): void;

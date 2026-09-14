@@ -17,11 +17,25 @@
  * @module dsh-improve-prompt
  */
 
-import type { Context } from 'cordis'
 import z from 'schemastery'
 import { resolveConfig, type Mode, type ResolvedConfig } from './config.js'
 import { improveDraft, ERR, type ImproveDeps, type SessionsFace } from './orchestrate.js'
 import type { LlmFace, Route } from './llm-call.js'
+
+/**
+ * The slice of the Cordis host context this plugin touches.
+ *
+ * Declared structurally rather than imported: the built plugin then type-checks
+ * against nothing but TypeScript and @types/node, so a peer-package version skew
+ * can never turn into a build failure. Every member is read defensively at call
+ * time anyway (see `service()` below).
+ */
+export interface HostContext {
+  effect(fn: () => unknown | (() => void), label?: string): unknown
+  on(event: string, listener: (...args: never[]) => unknown): unknown
+  get(name: string): unknown
+  logger?: { warn?: (message: string) => void }
+}
 
 /** Cordis plugin name. */
 export const name = 'dsh-improve-prompt'
@@ -76,12 +90,12 @@ function readBody(req: HttpRequest): Promise<string> {
  * @param ctx - cordis context carrying `llm` and `webServer`.
  * @param rawConfig - loader-supplied configuration (all keys optional).
  */
-export function apply(ctx: Context, rawConfig: unknown): void {
+export function apply(ctx: HostContext, rawConfig: unknown): void {
   const config: ResolvedConfig = resolveConfig(rawConfig)
-  const log = (ctx as unknown as { logger?: { warn?: (m: string) => void } }).logger
+  const log = ctx.logger
   // ctx.get() is the non-throwing accessor for a service outside the declared inject
   // list; reading ctx.<service> directly throws for an uninjected one.
-  const service = (serviceName: string): unknown => (ctx as unknown as { get(n: string): unknown }).get(serviceName)
+  const service = (serviceName: string): unknown => ctx.get(serviceName)
 
   // Last route observed on the live waterfall: the fallback when neither the config
   // nor the default-model selection names one. Waterfall listeners MUST delegate.
