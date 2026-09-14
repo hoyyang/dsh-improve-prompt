@@ -80,6 +80,15 @@ export const css = [
   '.dip-aurora{position:absolute;inset:0;border-radius:999px;pointer-events:none;z-index:0;',
   'opacity:.85;transition:opacity .3s;background:' + AURORA + '}',
 
+  /* indeterminate progress: an energy bar sweeping the bottom inner edge, busy only.
+     It occupies y25..27 of a 28px pill while the label box is y8..20, so it can never
+     pass under a glyph — a geometric guarantee the harness asserts. */
+  '.dip-arc{position:absolute;left:0;right:0;bottom:1px;height:2px;border-radius:2px;opacity:0;',
+  'pointer-events:none;z-index:1;background-repeat:no-repeat;background-size:42% 100%;background-position:-60% 0;',
+  'background-image:linear-gradient(90deg,transparent,rgba(125,211,252,.95),rgba(245,197,66,.9),transparent);',
+  'transition:opacity .25s ease}',
+  '.dip-btn[data-busy="true"] .dip-arc{opacity:1;animation:dip-sweep 1.5s cubic-bezier(.55,.05,.35,.95) infinite}',
+
   /* travelling rim light, masked to the 1px band */
   '.dip-ring{position:absolute;inset:0;border-radius:999px;padding:1px;opacity:0;pointer-events:none;z-index:1;',
   'background:conic-gradient(from 0deg,transparent 0 38%,rgba(34,211,238,.95) 56%,rgba(245,197,66,1) 72%,rgba(125,211,252,.95) 86%,transparent 100%);',
@@ -97,7 +106,7 @@ export const css = [
   'box-shadow:0 0 0 1px rgba(125,211,252,.55),0 6px 26px rgba(43,108,255,.6),0 0 24px rgba(56,189,248,.45),',
   '0 0 28px rgba(245,197,66,.26),inset 0 1px 0 rgba(255,255,255,.34),inset 0 2px 6px rgba(226,244,255,.14),',
   'inset 0 -1px 0 rgba(245,197,66,.26),inset 0 0 18px rgba(43,108,255,.4),0 3px 8px rgba(0,0,0,.38)}',
-  '.dip-btn:hover:not(:disabled) .dip-ring{opacity:1;animation:dip-rim 2.6s linear infinite}',
+  '.dip-btn:hover:not(:disabled) .dip-ring{opacity:.85;animation:dip-rim 3.4s linear infinite}',
   '.dip-seat:hover .dip-aurora{opacity:1}',
   '.dip-seat:hover .dip-spark{opacity:.9;transform:translateY(-50%) scale(1.12) rotate(90deg)}',
   '.dip-seat:hover .dip-icon{transform:scale(1.18) rotate(-6deg)}',
@@ -108,10 +117,16 @@ export const css = [
   '.dip-btn:active:not(:disabled) .dip-ring{opacity:1;animation-duration:1.1s}',
 
   /* ---------- busy: the rim runs continuously ---------- */
-  '.dip-btn[data-busy="true"] .dip-ring{opacity:1;animation:dip-rim 1.2s linear infinite}',
-  '.dip-btn[data-busy="true"] .dip-icon{animation:dip-icon-spin 1.1s linear infinite}',
-  '.dip-seat[data-busy="true"] .dip-aurora{opacity:1;animation:dip-aurora 2s ease-in-out infinite}',
-  '.dip-seat[data-busy="true"] .dip-spark{opacity:.95;animation:dip-spark-pulse 1.6s ease-in-out infinite}',
+  // Busy is a different animal from hover, not a faster hover: the chip charges (a slow
+  // breath), the rim becomes a thick comet with a long tail, and the bottom edge carries
+  // a moving energy bar. Hover keeps only the lift, the brightening and a slow rim.
+  '.dip-btn[data-busy="true"]{animation:dip-charge 2.1s ease-in-out infinite}',
+  '.dip-btn[data-busy="true"] .dip-ring{opacity:1;padding:2px;animation:dip-rim 1s linear infinite;',
+  'background:conic-gradient(from 0deg,transparent 0 8%,rgba(34,211,238,.45) 22%,rgba(125,211,252,1) 40%,',
+  'rgba(245,197,66,1) 54%,transparent 70%)}',
+  '.dip-btn[data-busy="true"] .dip-icon{animation:dip-icon-spin .8s linear infinite}',
+  '.dip-seat[data-busy="true"] .dip-aurora{opacity:1;animation:dip-aurora 1.1s ease-in-out infinite}',
+  '.dip-seat[data-busy="true"] .dip-spark{opacity:1;animation:dip-spark-pulse 1.1s ease-in-out infinite}',
 
   /* ---------- quiet states ---------- */
   '.dip-btn:focus-visible{outline:2px solid rgba(125,211,252,.85);outline-offset:2px}',
@@ -155,6 +170,8 @@ export const css = [
 
   /* ---------- keyframes ---------- */
   '@keyframes dip-rim{to{transform:rotate(360deg)}}',
+  '@keyframes dip-sweep{from{background-position:-60% 0}to{background-position:160% 0}}',
+  '@keyframes dip-charge{0%,100%{transform:scale(1)}50%{transform:scale(1.028)}}',
   '@keyframes dip-icon-spin{to{transform:rotate(360deg)}}',
   '@keyframes dip-aurora{0%,100%{opacity:.7}50%{opacity:1}}',
   '@keyframes dip-spark-pulse{0%,100%{opacity:.5;transform:translateY(-50%) scale(.95)}50%{opacity:1;transform:translateY(-50%) scale(1.15)}}',
@@ -164,6 +181,8 @@ export const css = [
   '.dip-btn,.dip-ring,.dip-aurora,.dip-spark,.dip-icon,.dip-chevron,.dip-undo{animation:none!important;',
   'transition-duration:.01ms!important}',
   '.dip-btn:hover:not(:disabled) .dip-ring,.dip-btn[data-busy="true"] .dip-ring{opacity:1}',
+  // busy must still read as busy with motion off: a full-width static bar instead
+  '.dip-btn[data-busy="true"] .dip-arc{opacity:1;background-size:100% 100%;background-position:0 0}',
   '.dip-seat[data-busy="true"] .dip-aurora{opacity:1}',
   '}',
 ].join('\n')

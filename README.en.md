@@ -87,9 +87,9 @@ Three material details make the glass read as glass: a **specular band along the
 | State | Treatment |
 |---|---|
 | **Idle** | Dark glass chip, full gradient rim, one cyan pool at the icon |
-| **Hover** | Lifts 1.5px, scales 1.04, the rim brightens, the pools brighten, the narrow outer halo strengthens |
+| **Hover** | Lifts 1.5px, scales 1.04, the rim brightens and turns slowly (3.4s per lap), the pools brighten, the narrow halo strengthens; no bar, no breath, no comet tail |
 | **Press** | Settles to `scale(.94)`, brightness pulls back, the rim speeds up |
-| **Busy** | The rim becomes a running ring, the icon spins, the pools breathe |
+| **Busy** | **Deliberately unlike hover**: the rim becomes a long-tailed **comet**, a **sweeping energy bar** runs along the bottom edge (indeterminate progress), the whole chip **charges** (scale 1 -> 1.028), the icon spins and the pools breathe |
 | **Disabled / focus** | Desaturated and dimmed, rim extinguished; `focus-visible` keeps a keyboard ring |
 | **Reduced motion** | Every animation stops under `prefers-reduced-motion` — motion only, never legibility |
 
@@ -102,11 +102,11 @@ Three material details make the glass read as glass: a **specular band along the
 | State | Dark theme | Light theme |
 |---|---|---|
 | Idle | 11.07:1 | 11.07:1 |
-| Hover | 9.89:1 | 15.28:1 |
+| Hover | 9.83:1 | 15.36:1 |
 | Press | 8.77:1 | 14.53:1 |
-| Busy | 9.13:1 | 15.43:1 |
+| Busy | 10.99:1 | 11.00:1 |
 
-Worst case **8.77:1** (WCAG AA wants >= 4.5:1 for body text). Disabled is measured too: WCAG exempts inactive controls, this plugin's requirement does not.
+Worst case **9.83:1** (WCAG AA wants >= 4.5:1 for body text). Disabled is measured too: WCAG exempts inactive controls, this plugin's requirement does not.
 
 ### How the art was reviewed (reproducible)
 

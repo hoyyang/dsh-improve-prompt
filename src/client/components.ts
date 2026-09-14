@@ -185,6 +185,7 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
     },
     React.createElement('span', { className: 'dip-aurora', 'aria-hidden': 'true' }),
     React.createElement('span', { className: 'dip-ring', 'aria-hidden': 'true' }),
+    React.createElement('span', { className: 'dip-arc', 'aria-hidden': 'true' }),
     React.createElement('span', { className: 'dip-spark', 'aria-hidden': 'true' }),
     Sparkle(),
     React.createElement('span', { className: 'dip-label' }, modeLabel),

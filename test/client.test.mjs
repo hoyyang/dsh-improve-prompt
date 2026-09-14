@@ -308,11 +308,11 @@ test('the pill contains every light layer, and the label is the topmost of them'
   const seatChildren = seat[0].children.map((c) => (typeof c === 'string' ? c : c.props.className))
   assert.deepEqual(seatChildren, ['dip-btn'])
 
-  // inside the pill, the order is: contained light, rim light, spark, icon, label
+  // inside the pill, the order is: contained light, rim light, progress bar, spark, icon, label
   const pill = renderer.root.findAllByProps({ className: 'dip-btn' })[0]
   const inner = pill.children.map((c) => (typeof c === 'string' ? c : c.props.className))
-  assert.deepEqual(inner, ['dip-aurora', 'dip-ring', 'dip-spark', 'dip-icon', 'dip-label'])
-  for (const decor of ['dip-aurora', 'dip-ring', 'dip-spark']) {
+  assert.deepEqual(inner, ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-spark', 'dip-icon', 'dip-label'])
+  for (const decor of ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-spark']) {
     const el = renderer.root.findAllByProps({ className: decor })[0]
     assert.equal(el.props['aria-hidden'], 'true', decor + ' is decoration, never content')
   }
@@ -343,6 +343,19 @@ test('the stylesheet keeps the guarantees the legibility check relies on', async
 
   // the label owns a stacking level above every light layer
   assert.match(css, /\.dip-label\{position:relative;z-index:2/)
+
+  // the progress bar hugs the bottom edge and stays short, so it cannot reach the label box
+  assert.match(css, /\.dip-arc\{position:absolute;left:0;right:0;bottom:(\d+)px;height:(\d+)px/)
+  const barBottom = Number(/\.dip-arc\{position:absolute;left:0;right:0;bottom:(\d+)px/.exec(css)?.[1])
+  const barHeight = Number(/bottom:\d+px;height:(\d+)px/.exec(css)?.[1])
+  assert.ok(barHeight <= 3, 'the bar stays a hairline, got ' + String(barHeight) + 'px')
+  // pill is 28px tall with the label vertically centred; the bar lives in the last few px
+  assert.ok(barBottom + barHeight <= 4, 'the bar hugs the bottom edge')
+
+  // and busy must be visibly different from hover, not just faster
+  assert.match(css, /@keyframes dip-sweep/, 'busy has its own sweeping progress bar')
+  assert.match(css, /@keyframes dip-charge/, 'busy has its own charging breath')
+  assert.match(css, /\.dip-btn\[data-busy="true"\]\{animation:dip-charge/, 'the chip itself charges while busy')
 
   // the spark is a filled sprite: its box must stay clear of the label's box
   const sparkLeft = Number(/\.dip-spark\{position:absolute;left:(\d+)px/.exec(css)?.[1])
