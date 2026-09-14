@@ -40,6 +40,7 @@ dsh plugin --profile web remove dsh-improve-prompt   # uninstall
 - **Length gate** — a rewrite over budget (2.5x in Standard, **never below a 200-character absolute floor**) gets one convergence call carrying an explicit character budget; if it is still over, nothing is written back and the reason is shown. This kills the runner-up failure mode: a one-line request returned as a thirty-line specification.
 - **Quality certificate** — the status bar tells you whether to trust the result: `Improved · fidelity 5/5 · 1.0x · 2.2s`.
 - **Two modes** — **Light** (de-filler and disambiguate, ≤1.2x — WorkBuddy's own "fewer tokens" positioning) / **Standard** (restructure, ≤2.5x). Remembered locally.
+- **Slash commands work too** — with `/bugfix ISS-202607-00090605A 用户反馈填充后密码框被清空…` the command prefix is **kept verbatim** and only the text after it is rewritten. The button is disabled only when a command has no body yet, which is genuinely nothing to rewrite.
 - **Cancellable** — press ✦ again while it runs to genuinely abort the upstream request (`AbortSignal`).
 - **Failure keeps your draft** — no model, timeout, empty output, network error: your input is **never touched**, you just get one readable message.
 - **Smart session context** — history is attached only when the draft cannot stand alone (an anaphoric marker like it / this / the same way, or a ≤12-character draft with no concrete fact). The decision is a local regex, zero extra calls. What travels: **your own words + the tail of the assistant's prose** (600 characters per turn). Tool results, plugin-injected context, images, reasoning, and project source never do.
@@ -170,7 +171,8 @@ All behaviour lives in `prompts/*.md`: `discipline.md` (the global discipline la
 ```
 composer draft
    │
-   ├─ local guards (empty / slash command / too long) ──► refuse, zero model traffic
+   ├─ local guards (empty / command-without-body / too long) ──► refuse, zero model traffic
+   ├─ slash-command split (/bugfix body → prefix kept verbatim, only the body rewritten)
    │
    ├─ smart-context decision (local regex) ──hit──► read the last N turns (human + assistant prose only)
    │
@@ -193,7 +195,7 @@ The host half is one loopback route plus the orchestrator; the browser half regi
 
 Everything below was actually run before publishing:
 
-1. **71 tests, all green** — pure functions (hard-fact extraction / fidelity checking / length judgement / context trigger / output normalization / session history) plus **full orchestration against a stub model** (repair pass, re-append, refusal, timeout, cancellation, upstream failure, injection defence) plus the **built client bundle** (registration contract, disabled states, click-to-write-back, failure leaving the draft untouched, undo, mode memory, localization and fallback).
+1. **86 tests, all green** — pure functions (hard-fact extraction / fidelity checking / length judgement / context trigger / output normalization / session history / slash-command splitting) plus **full orchestration against a stub model** (repair pass, re-append, refusal, timeout, cancellation, upstream failure, injection defence) plus the **built client bundle** (registration contract, disabled states, click-to-write-back, failure leaving the draft untouched, undo, mode memory, localization and fallback).
 2. **Strict TypeScript checks** pass for both halves (`npm run typecheck` and `typecheck:client`).
 3. **Cold-start three-failure static check green**: link-dependency junction, bundle manifest, disabled-state contradiction — plus a clean `dsh --dump-config` composition check.
 4. **Uninstall verified clean**: route unregistered, junction removed, zero profile-manifest residue, loader entry and client module table cleared.
@@ -222,7 +224,7 @@ Everything below was actually run before publishing:
 pnpm install
 npm run build          # host: tsc → lib/
 npm run build:client   # client: tsdown → lib/client.js (window.__ModuleLoader__ format)
-npm test               # 71 tests
+npm test               # 86 tests
 npm run typecheck && npm run typecheck:client
 ```
 

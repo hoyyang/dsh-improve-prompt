@@ -5,6 +5,7 @@
  */
 
 import React from 'react'
+import { splitCommand } from '../command.js'
 import { clear, getMode, notify, setMode, storeFor, subscribe, type InputActionsFace, type Meta, type Mode } from './store.js'
 
 /** Localized copy lookup bound to the plugin namespace. */
@@ -66,8 +67,12 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
   const sessionId = props.sessionId
   useSessionState(sessionId)
   const draft = readDraft(props)
-  const trimmed = draft.trim()
-  const blocked = trimmed === '' || trimmed.startsWith('/')
+  // A leading slash token belongs to the harness; only the text after it is ours.
+  // A command with no body therefore has nothing to enhance — but a command WITH a
+  // body is exactly the case worth enhancing.
+  const split = splitCommand(draft)
+  const commandOnly = split.command !== '' && split.body === ''
+  const blocked = split.body === ''
   const state = sessionId !== undefined ? storeFor(sessionId) : null
   const busy = state !== null && state.phase === 'busy'
   const actions = props.inputActions !== undefined ? props.inputActions : (state !== null ? state.actions : null)
@@ -86,7 +91,7 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
       return
     }
     const text = draft
-    if (text.trim() === '' || text.trimStart().startsWith('/')) return
+    if (splitCommand(text).body === '') return
     const controller = new AbortController()
     current.controller = controller
     current.phase = 'busy'
@@ -140,7 +145,9 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
     if (sessionId !== undefined) notify(sessionId)
   }, [sessionId])
 
-  const title = busy ? t('buttonTitleBusy') : t('buttonTitle')
+  const title = busy
+    ? t('buttonTitleBusy')
+    : commandOnly ? t('commandOnlyTitle') : split.command !== '' ? t('buttonTitleCommand') : t('buttonTitle')
   const modeLabel = mode === 'light' ? t('modeLight') : t('modeStandard')
 
   return React.createElement('div', { className: 'dip-root' },

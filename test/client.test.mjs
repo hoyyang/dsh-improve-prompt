@@ -128,8 +128,46 @@ test('the button renders enabled with a draft and disabled on an empty composer 
   const empty = await mount(button, seatProps({ draft: '   ' }))
   assert.equal(empty.root.findAllByType('button')[0].props.disabled, true)
 
-  const command = await mount(button, seatProps({ draft: '/help me' }))
+  // A bare command has no body — nothing to rewrite. (A command WITH a body is
+  // enhancable; that case is covered by the slash-command test below.)
+  const command = await mount(button, seatProps({ draft: '/help' }))
   assert.equal(command.root.findAllByType('button')[0].props.disabled, true)
+  assert.equal(command.root.findAllByType('button')[0].props.title, 'commandOnlyTitle')
+})
+
+test('a slash command with a body stays clickable, a bare command does not', async () => {
+  const { button } = await boot()
+
+  // The case that used to be blocked by mistake: /bugfix <正文> has a real body.
+  const withBody = await mount(button, seatProps({ draft: '/bugfix ISS-202607-00090605A 填充后密码框被清空' }))
+  assert.equal(withBody.root.findAllByType('button')[0].props.disabled, false,
+    'a command carrying a body must be enhancable')
+  assert.equal(withBody.root.findAllByType('button')[0].props.title, 'buttonTitleCommand',
+    'and the tooltip says the prefix is preserved')
+
+  // A command with nothing after it still has nothing to rewrite.
+  const bare = await mount(button, seatProps({ draft: '/bugfix' }))
+  assert.equal(bare.root.findAllByType('button')[0].props.disabled, true)
+  // The locale key is the contract; the copy itself lives in locales.ts.
+  assert.equal(bare.root.findAllByType('button')[0].props.title, 'commandOnlyTitle')
+
+  const blankCommand = await mount(button, seatProps({ draft: '/bugfix   ' }))
+  assert.equal(blankCommand.root.findAllByType('button')[0].props.disabled, true)
+})
+
+test('clicking on a slash-command draft sends only the body', async () => {
+  const { button } = await boot()
+  const calls = []
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (url, options) => { calls.push(JSON.parse(options.body)); return okResponse() }
+  try {
+    const renderer = await mount(button, seatProps({ draft: '/bugfix 把登录接口改快一点' }))
+    await TestRenderer.act(async () => { await renderer.root.findAllByType('button')[0].props.onClick() })
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0].text, '/bugfix 把登录接口改快一点', 'the full draft goes to the host, which owns the split')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
 })
 
 test('the button still renders on a host that only provides a point-in-time input snapshot', async () => {

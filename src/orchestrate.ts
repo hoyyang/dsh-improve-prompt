@@ -9,6 +9,7 @@
  */
 
 import { extractAnchors } from './anchors.js'
+import { splitCommand } from './command.js'
 import { maxRatioFor, type Mode, type ResolvedConfig } from './config.js'
 import { checkFidelity, fidelityNote, reinjectionBlock, repairClause } from './fidelity.js'
 import { collectTurns, formatHistoryBlock } from './history.js'
@@ -104,12 +105,18 @@ function failureOf(failure: CallFailure, cfg: ResolvedConfig): ImproveErr {
 export async function improveDraft(deps: ImproveDeps, cfg: ResolvedConfig, input: ImproveInput): Promise<ImproveOutcome> {
   // ---- local guards: refuse before any model traffic ----
   if (input.draft.trim() === '') return { ok: false, code: ERR.EMPTY, message: '输入框为空' }
-  if (input.draft.trimStart().startsWith('/')) return { ok: false, code: ERR.COMMAND, message: '斜杠命令不参与改写' }
-  if (charLength(input.draft) > cfg.maxInputChars) {
+  // A leading slash token is the harness's command: rewrite only what follows it,
+  // then put the prefix back verbatim. A command with no body has nothing to do.
+  const split = splitCommand(input.draft)
+  if (split.command !== '' && split.body === '') {
+    return { ok: false, code: ERR.COMMAND, message: '斜杠命令后没有可改写的正文' }
+  }
+  const draft = split.body
+  if (charLength(draft) > cfg.maxInputChars) {
     return {
       ok: false,
       code: ERR.TOO_LONG,
-      message: '草稿过长（' + String(charLength(input.draft)) + ' > ' + String(cfg.maxInputChars) + ' 字符）',
+      message: '草稿过长（' + String(charLength(draft)) + ' > ' + String(cfg.maxInputChars) + ' 字符）',
     }
   }
   if (deps.llm === undefined) return { ok: false, code: ERR.NO_ROUTE, message: '模型服务不可用' }
@@ -131,7 +138,7 @@ export async function improveDraft(deps: ImproveDeps, cfg: ResolvedConfig, input
 
   // ---- context: only when the draft cannot stand alone ----
   const trigger = cfg.smartContext && cfg.contextTurns > 0
-    ? contextTrigger(input.draft)
+    ? contextTrigger(draft)
     : { needed: false, reason: 'none' as const }
   let contextBlock = ''
   if (trigger.needed && input.sessionId !== '' && deps.sessions !== undefined) {
@@ -146,12 +153,12 @@ export async function improveDraft(deps: ImproveDeps, cfg: ResolvedConfig, input
   }
 
   const system = buildSystemPrompt(input.mode, cfg)
-  const anchors = cfg.fidelityGate ? extractAnchors(input.draft) : []
+  const anchors = cfg.fidelityGate ? extractAnchors(draft) : []
   const maxRatio = maxRatioFor(cfg, input.mode)
 
   const first = await callModel(deps.llm, {
     route, system, config: cfg, signal: input.signal,
-    userMessage: buildUserMessage(input.draft, contextBlock, ''),
+    userMessage: buildUserMessage(draft, contextBlock, ''),
   })
   if (!first.ok) return failureOf(first.failure, cfg)
 
@@ -160,7 +167,7 @@ export async function improveDraft(deps: ImproveDeps, cfg: ResolvedConfig, input
 
   // ---- gates ----
   let fidelity = checkFidelity(anchors, enhanced)
-  const verdict = cfg.lengthGate ? lengthVerdict(input.draft, enhanced, maxRatio) : { kind: 'ok' as const, ratio: 1 }
+  const verdict = cfg.lengthGate ? lengthVerdict(draft, enhanced, maxRatio) : { kind: 'ok' as const, ratio: 1 }
 
   if ((fidelity.missing.length > 0 || verdict.kind === 'converge') && !input.signal.aborted) {
     const clauses: string[] = []
@@ -173,7 +180,7 @@ export async function improveDraft(deps: ImproveDeps, cfg: ResolvedConfig, input
 
     const repair = await callModel(deps.llm, {
       route, system, config: cfg, signal: input.signal,
-      userMessage: buildUserMessage(input.draft, contextBlock, clauses.join('\n')),
+      userMessage: buildUserMessage(draft, contextBlock, clauses.join('\n')),
     })
     if (repair.ok) {
       const repaired = normalizeOutput(repair.text)
@@ -196,8 +203,8 @@ export async function improveDraft(deps: ImproveDeps, cfg: ResolvedConfig, input
   }
 
   // ---- final length judgement: a re-appended fact outranks the ceiling ----
-  const finalRatio = charLength(input.draft) === 0 ? 0 : charLength(enhanced) / charLength(input.draft)
-  const finalBudget = budgetFor(input.draft, maxRatio)
+  const finalRatio = charLength(draft) === 0 ? 0 : charLength(enhanced) / charLength(draft)
+  const finalBudget = budgetFor(draft, maxRatio)
   if (cfg.lengthGate && reinjected === 0 && charLength(enhanced) > finalBudget) {
     return {
       ok: false,
@@ -209,7 +216,7 @@ export async function improveDraft(deps: ImproveDeps, cfg: ResolvedConfig, input
 
   return {
     ok: true,
-    text: enhanced,
+    text: split.prefix + enhanced,
     meta: {
       mode: input.mode,
       model: route.provider + '/' + route.model,
