@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+- **修掉「本机能过、干净环境必炸」**：`src/index.ts` 不再 `import type { Context } from 'cordis'`。本地能过是因为 `scripts/build.sh` 把 `node_modules/cordis` 链到本机 dsh 安装里的 `@deepseek-ai/cordis`；CI 里 pnpm 装的是 npm 同名包，没有该导出，类型检查直接失败。现改为宿主上下文与模型请求/流式分片全部就地结构化声明，构建产物只依赖 TypeScript 与 `@types/node`。
+- 新增 GitHub Actions CI（双类型检查 + 71 单测 + 已提交产物可加载 + manifest 装配契约）与 CI 徽章。
+- 已在克隆副本中用 `pnpm install --frozen-lockfile` 完整复现 CI 并全绿。
+
 ## 0.1.1
 
 文档与渠道发布版（代码与 0.1.0 一致）。
