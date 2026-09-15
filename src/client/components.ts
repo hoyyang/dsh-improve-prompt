@@ -167,9 +167,11 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
   const isDisabled = !busy && (blocked || actions === null)
 
   // Layer order matters and is documented in styles.ts. The chip is .dip-root itself:
-  // one glass plate carrying two zones. Every light source is contained inside it, the
-  // hairline divider separates the two hit targets without touching a glyph, and each
-  // zone's ink is the topmost element of that zone.
+  // one glass plate carrying two zones, collapsed to the star circle by default and
+  // expanding on hover/focus/busy with its RIGHT edge pinned (the host's .trailing
+  // cluster is margin-left:auto, so only dsh-concise on the left reflows — measured,
+  // not assumed). The mode dot keeps the collapsed circle state-aware; the burst is
+  // the press shockwave that replaced geometry scaling.
   return React.createElement('div', {
     className: 'dip-root',
     'data-busy': busy ? 'true' : 'false',
@@ -181,7 +183,7 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
     type: 'button',
     className: 'dip-btn',
     disabled: isDisabled,
-    'aria-label': t('buttonAria'),
+    'aria-label': t('buttonAria') + ' · ' + modeLabel,
     title,
     onClick,
   },
@@ -197,8 +199,11 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
     title: (mode === 'light' ? t('modeLightHint') : t('modeStandardHint')) + ' · ' + t('modeSwitchTitle'),
     onClick: onCycleMode,
   },
-  React.createElement('span', { className: 'dip-caret', 'aria-hidden': 'true' }, '\u25BE'),
+  React.createElement('svg', { className: 'dip-caret', viewBox: '0 0 12 10', width: '12', height: '10', 'aria-hidden': 'true', focusable: 'false' },
+  React.createElement('path', { d: 'M1.2 2.7H10.8M8.9 0.9L10.8 2.7L8.9 4.5M10.8 7.3H1.2M3.1 5.5L1.2 7.3L3.1 9.1', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'round', strokeLinejoin: 'round' }),
   ),
+  ),
+  React.createElement('span', { className: 'dip-burst', 'aria-hidden': 'true' }),
   )
 }
 

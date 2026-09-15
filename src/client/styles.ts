@@ -1,34 +1,28 @@
 /**
  * Plugin-owned CSS, scoped by a data attribute and torn down with the fiber.
  *
- * ## Material: ONE split glass chip (v6 — the mode switch is fused into the plate)
+ * ## Material: ONE split glass chip that collapses to a star circle (v7)
  *
- * Through v5 the chip and the mode chevron were two disjoint elements: a crafted glass
- * pill next to a bare glyph on the composer's own background. On a light theme that glyph
- * was a dim dot on light grey — unreadable, and visually a foreign body beside the chip.
- * The fix is structural, not cosmetic: the chip IS the component now, one plate carrying
- * two zones —
+ * v6 fused the mode switch into the plate (one chip, two zones, hairline divider).
+ * v7 makes the whole chip collapse to its 28px star circle when idle and expand back
+ * to the full split pill on hover / keyboard focus / busy — with the RIGHT edge
+ * pinned. Measured host fact (dsh-client-ui-conversation client.js:15757):
+ * `.trailing{flex:none;gap:12px;margin-left:auto}` — the cluster's right edge is
+ * anchored, so a real width change here shifts ONLY dsh-concise on the left by the
+ * same delta and keeps the 12px gaps. dsh-concise needs no change; no overlay tricks.
  *
- *   ╔══════════════╗
- *   ║ ✦ 标准 │ ▾ ║   main zone | hairline | switch zone
- *   ╚══════════════╝
- *
- * - **the plate is always dark** — `#061024 -> #0c2144` glass, in both themes. It is not
- *   inverted on a light theme; a dark chip simply reads as a chip there, and it is the only
- *   way one set of accent colours can stay legible on both backgrounds.
- * - **the border is a conic gradient** — cyan -> sky -> electric blue -> gold, painted with
- *   the `padding-box / border-box` double-background trick. Conic, because a linear ramp
- *   only shows its first quarter on a narrow chip (measured in v4).
- * - **the aurora lives inside the chip** — soft radial washes at `inset:0`, one pool per
- *   zone: cyan over the main action, electric blue over the switch, gold catching the
- *   lower edge. The switch zone carrying its own pool is what makes the fusion read as
- *   one deliberate object instead of a pill with a bump.
- * - **the divider is a hairline of glass** — 1px, fading at both ends, with a faint glow.
- *   It separates hit targets, never crosses a glyph.
- * - **both zones speak the same ink** — near-white on the dark plate plus a dark
- *   text-shadow; the caret gets the same treatment as the label. No light source ever
- *   sits under a glyph: the spark owns the icon slot, the rim is masked to the 1px
- *   border band, the energy bar occupies only the bottom 2px.
+ * - **the plate is always dark** — `#061024 -> #0c2144` glass, in both themes.
+ * - **the border is a conic gradient** — width-independent, every hue always on the rim.
+ * - **the aurora lives inside the chip** — a cyan pool over the main action, an
+ *   electric-blue pool over the switch zone, gold catching the lower edge.
+ * - **collapse = content technique, not squish** — the label, divider and switch
+ *   zone animate `max-width`/`opacity` (the dsh-concise label craft), the main
+ *   zone animates `gap`/`padding`; the pill radius morphs circle <-> pill for free.
+ *   No transform scaling anywhere on the chip: expansion IS the hover response.
+ * - **the collapsed circle is state-aware** — a slow breathing glow plays while a
+ *   draft is enhanceable (the disabled star stays dark and quiet).
+ * - **press = energy, not geometry** — a shockwave ring expands from the star, the
+ *   rim does one fast lap, the aurora pulses; the chip itself never scales.
  *
  * ## Layer order (the legibility guarantee)
  *
@@ -39,11 +33,14 @@
  *   `.dip-btn`     — main zone, `z-index:2`; spark (icon slot) + icon + label inside
  *   `.dip-divider` — hairline, `z-index:2`
  *   `.dip-chevron` — switch zone, `z-index:2`; `.dip-caret` glyph inside
+ *   `.dip-burst`   — press shockwave, `z-index:1`, one-shot on `:active`
  *
- * Because the plate never turns translucent and no layer brightens under the glyphs, the
- * measured contrast is the same in every state and both themes — for the label AND the
- * caret. `npm run harness:button` renders every state from this file plus the real
- * component and the boxes needed to measure it from pixels.
+ * No light source ever sits under a glyph: the spark owns the icon slot, the rim is
+ * masked to the 1px border band, the energy bar occupies only the bottom 2px. The
+ * plate never turns translucent, so label and caret contrast hold in both themes and
+ * every state. `npm run harness:button` renders every state plus the boxes needed
+ * to measure it from pixels, and a trailing-row simulation that proves the neighbor
+ * reflow (dsh-concise shifts, our right edge stays).
  *
  * @module dsh-improve-prompt/client/styles
  */
@@ -64,8 +61,8 @@ const CARET = '#cfe4ff'
 const PLATE = 'linear-gradient(135deg,#061024 0%,#08182e 52%,#0c2144 100%)'
 /**
  * The rim. A LINEAR ramp only shows its first quarter on a narrow chip — measured against
- * the reference: cyan appeared and everything after it never did. A conic ramp is
- * width-independent, so every hue of this palette is always on the rim.
+ * the reference. A conic ramp is width-independent, so every hue of this palette is
+ * always on the rim, at every width from 28px circle to full pill.
  */
 const RIM = 'conic-gradient(from 200deg at 50% 50%,#22d3ee 0%,#38bdf8 15%,#2b6cff 38%,#1d4ed8 52%,#f5c542 80%,#ffe9a8 90%,#22d3ee 100%)'
 /** Contained light: a pool per zone plus the gold lower edge, all inside the chip. */
@@ -91,7 +88,7 @@ const SHADOW_IDLE = [
   '0 2px 6px rgba(0,0,0,.34)',
 ].join(',')
 
-/** Hover: lifted, brighter, wider glow. */
+/** Hover: brighter, wider glow — no transform, expansion IS the hover response. */
 const SHADOW_HOVER = [
   '0 0 0 1px rgba(125,211,252,.55)',
   '0 6px 26px rgba(43,108,255,.6)',
@@ -114,18 +111,28 @@ const SHADOW_QUIET = [
   '0 2px 5px rgba(0,0,0,.3)',
 ].join(',')
 
+/** The breathing attract glow: idle stack plus one soft cyan halo at the peak. */
+const SHADOW_ATTRACT = SHADOW_IDLE + ',0 0 16px rgba(56,189,248,.4)'
+
+/**
+ * Expansion applies on hover, keyboard focus (focus-VISIBLE only — a mouse click on
+ * the switch must not keep the chip expanded after the pointer leaves; measured user
+ * report 0.7.0), and busy.
+ */
+const EXPANDED = '.dip-root:is(:hover,:has(:focus-visible),[data-busy="true"])'
+
 export const css = [
-  /* ---------- the chip: one plate, two zones ---------- */
+  /* ---------- the chip: one plate, two zones, collapses right-pinned ---------- */
   '.dip-root{position:relative;display:inline-flex;align-items:stretch;isolation:isolate;',
-  'height:28px;border-radius:999px;overflow:hidden;user-select:none;vertical-align:middle;flex:none;',
+  'height:30px;border-radius:999px;overflow:hidden;user-select:none;vertical-align:middle;flex:none;',
   'border:1px solid transparent;box-sizing:border-box;cursor:default;',
   'background:' + PLATE + ' padding-box,' + RIM + ' border-box;',
   'box-shadow:' + SHADOW_IDLE + ';',
-  'transition:transform .16s cubic-bezier(.34,1.56,.64,1),box-shadow .28s,filter .28s}',
+  'transition:box-shadow .28s,filter .28s}',
 
   /* contained light: the aurora never leaves the chip */
   '.dip-aurora{position:absolute;inset:0;border-radius:999px;pointer-events:none;z-index:0;',
-  'opacity:.85;transition:opacity .3s;background:' + AURORA + '}',
+  'opacity:.85;transition:opacity .3s,filter .2s ease;background:' + AURORA + '}',
 
   /* indeterminate progress: an energy bar sweeping the bottom inner edge, busy only.
      It occupies y25..27 of a 28px chip while both glyph boxes live at y8..20, so it can
@@ -143,50 +150,64 @@ export const css = [
   'mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);',
   '-webkit-mask-composite:xor;mask-composite:exclude;transition:opacity .25s ease}',
 
-  /* ---------- the main zone ---------- */
-  '.dip-btn{position:relative;z-index:2;display:inline-flex;align-items:center;gap:6px;box-sizing:border-box;',
-  'height:28px;padding:0 8px 0 9px;border:0;background:transparent;cursor:pointer;outline:none;',
-  'line-height:1;font-size:12px;font-weight:600;letter-spacing:.15px;color:' + INK + '}',
+  /* ---------- the main zone: collapsed = 28px star circle ---------- */
+  '.dip-btn{position:relative;z-index:2;display:inline-flex;align-items:center;box-sizing:border-box;',
+  'height:28px;padding:0 6.5px;gap:0;border:0;background:transparent;cursor:pointer;outline:none;',
+  'line-height:1;font-size:12px;font-weight:600;letter-spacing:.15px;color:' + INK + ';',
+  'transition:gap .28s cubic-bezier(.34,1.3,.5,1),padding .28s cubic-bezier(.34,1.3,.5,1)}',
+  EXPANDED + ' .dip-btn{padding:0 8px 0 9px;gap:6px}',
   '.dip-btn:focus-visible{box-shadow:inset 0 0 0 2px rgba(125,211,252,.8)}',
 
   // The label is the topmost of its zone; the dark shadow is what keeps light glyphs crisp
-  // on the glass, the exact opposite of the mistake made for light glyphs on a light plate.
-  '.dip-label{position:relative;z-index:2;white-space:nowrap;',
-  'text-shadow:0 1px 6px rgba(4,8,18,.8),0 0 12px rgba(43,108,255,.35)}',
+  // on the glass. Collapsed it is a zero-width clipped box — the max-width craft from the
+  // dsh-concise label, blockified by the flex parent so max-width applies.
+  '.dip-label{position:relative;z-index:2;white-space:nowrap;overflow:hidden;',
+  'max-width:0;opacity:0;transform:translateX(-6px);',
+  'text-shadow:0 1px 6px rgba(4,8,18,.8),0 0 12px rgba(43,108,255,.35);',
+  'transition:max-width .3s cubic-bezier(.4,0,.2,1),opacity .22s ease,transform .3s cubic-bezier(.4,0,.2,1)}',
+  EXPANDED + ' .dip-label{max-width:64px;opacity:1;transform:none}',
 
   /* ---------- the hairline divider ---------- */
-  '.dip-divider{position:relative;z-index:2;width:1px;align-self:stretch;margin:7px 0;pointer-events:none;',
+  '.dip-divider{position:relative;z-index:2;width:1px;max-width:0;opacity:0;align-self:stretch;margin:7px 0;pointer-events:none;',
   'background:linear-gradient(180deg,transparent 0%,rgba(125,211,252,.55) 32%,rgba(207,228,255,.5) 55%,rgba(245,197,66,.32) 80%,transparent 100%);',
-  'box-shadow:0 0 4px rgba(56,189,248,.3)}',
+  'box-shadow:0 0 4px rgba(56,189,248,.3);',
+  'transition:max-width .3s cubic-bezier(.4,0,.2,1),opacity .22s ease}',
+  EXPANDED + ' .dip-divider{max-width:1px;opacity:1}',
 
   /* ---------- the switch zone ---------- */
   '.dip-chevron{position:relative;z-index:2;flex:none;width:24px;height:28px;box-sizing:border-box;padding:0;',
   'display:inline-flex;align-items:center;justify-content:center;cursor:pointer;background:transparent;',
-  'border:0;outline:none;color:' + CARET + ';transition:background-color .18s ease}',
+  'border:0;outline:none;color:' + CARET + ';overflow:hidden;max-width:0;opacity:0;',
+  'transition:max-width .3s cubic-bezier(.4,0,.2,1),opacity .22s ease,background-color .18s ease}',
+  EXPANDED + ' .dip-chevron{max-width:24px;opacity:1}',
   '.dip-chevron:focus-visible{box-shadow:inset 0 0 0 2px rgba(125,211,252,.8)}',
-  '.dip-caret{display:block;font-size:10px;font-weight:600;line-height:1;',
-  'text-shadow:0 1px 5px rgba(4,8,18,.85),0 0 8px rgba(43,108,255,.45);',
+  '.dip-caret{display:block;flex:none;',
+  'filter:drop-shadow(0 1px 3px rgba(4,8,18,.85)) drop-shadow(0 0 6px rgba(43,108,255,.45));',
   'transition:transform .18s cubic-bezier(.34,1.56,.64,1)}',
   '.dip-chevron:hover{background:linear-gradient(180deg,rgba(125,211,252,.12),rgba(43,108,255,.10))}',
   '.dip-chevron:hover .dip-caret{transform:translateY(1px)}',
   '.dip-chevron:active .dip-caret{transform:translateY(1px) scale(.88)}',
 
-  /* ---------- hover: the whole chip lifts, brightens, and starts the rim ---------- */
-  '.dip-root:hover{transform:translateY(-1.5px) scale(1.04);filter:brightness(1.1);box-shadow:' + SHADOW_HOVER + '}',
+  /* ---------- press: energy, not geometry ---------- */
+  '.dip-burst{position:absolute;left:16px;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;',
+  'border-radius:999px;pointer-events:none;z-index:1;opacity:0;',
+  'border:2px solid rgba(125,211,252,.85);transform:scale(.4)}',
+  '.dip-root:active .dip-burst{animation:dip-burst .5s cubic-bezier(.2,.6,.35,1)}',
+
+  /* ---------- hover: brighter + wider glow, the chip NEVER scales ---------- */
+  '.dip-root:hover{filter:brightness(1.1);box-shadow:' + SHADOW_HOVER + '}',
   '.dip-root:hover .dip-ring{opacity:.85;animation:dip-rim 3.4s linear infinite}',
   '.dip-root:hover .dip-aurora{opacity:1}',
   '.dip-root:hover .dip-spark{opacity:.9;transform:translateY(-50%) scale(1.12) rotate(90deg)}',
   '.dip-root:hover .dip-icon{transform:scale(1.18) rotate(-6deg)}',
 
   /* ---------- press ---------- */
-  '.dip-root:active{transform:translateY(0) scale(.94);transition-duration:.06s;filter:brightness(.98)}',
+  '.dip-root:active{filter:brightness(.98)}',
+  '.dip-root:active .dip-ring{opacity:1;animation:dip-rim .35s linear 1}',
+  '.dip-root:active .dip-aurora{opacity:1;filter:brightness(1.4)}',
   '.dip-root:active .dip-icon{transform:scale(.9)}',
-  '.dip-root:active .dip-ring{opacity:1;animation-duration:1.1s}',
 
   /* ---------- busy: the rim runs continuously across the WHOLE chip ---------- */
-  // Busy is a different animal from hover, not a faster hover: the chip charges (a slow
-  // breath), the rim becomes a thick comet with a long tail, and the bottom edge carries
-  // a moving energy bar. Hover keeps only the lift, the brightening and a slow rim.
   '.dip-root[data-busy="true"]{animation:dip-charge 2.1s ease-in-out infinite}',
   '.dip-root[data-busy="true"] .dip-btn{cursor:progress}',
   '.dip-root[data-busy="true"] .dip-ring{opacity:1;padding:2px;animation:dip-rim 1s linear infinite;',
@@ -195,6 +216,10 @@ export const css = [
   '.dip-root[data-busy="true"] .dip-icon{animation:dip-icon-spin .8s linear infinite}',
   '.dip-root[data-busy="true"] .dip-aurora{opacity:1;animation:dip-aurora 1.1s ease-in-out infinite}',
   '.dip-root[data-busy="true"] .dip-spark{opacity:1;animation:dip-spark-pulse 1.1s ease-in-out infinite}',
+
+  /* ---------- attract: a slow breath while a draft waits (never when dimmed) ---------- */
+  '.dip-root:has(.dip-btn:not(:disabled)):not(:hover):not(:focus-within):not([data-busy="true"])',
+  '{animation:dip-attract 3.2s ease-in-out infinite}',
 
   /* ---------- quiet states ---------- */
   // Disabled keeps readable ink: the plate is unchanged dark glass, only the light is gone.
@@ -207,8 +232,8 @@ export const css = [
   '.dip-root:has(.dip-btn:disabled) .dip-icon{opacity:.55}',
   '.dip-root:has(.dip-btn:disabled) .dip-chevron{cursor:pointer}',
 
-  // Generated spark, icon slot only: 3px + 18px = 21px, the label box starts at 9 + 15 + 6 = 30px
-  '.dip-spark{position:absolute;left:3px;top:50%;width:18px;height:18px;transform:translateY(-50%) scale(.95);',
+  // Generated spark, icon slot only: 2px + 18px = 20px, the label box starts at 9 + 15 + 6 = 30px
+  '.dip-spark{position:absolute;left:2px;top:50%;width:18px;height:18px;transform:translateY(-50%) scale(.95);',
   'z-index:1;background:url(' + AURA_URI + ') center/contain no-repeat;opacity:.5;pointer-events:none;',
   'transition:opacity .26s ease,transform .4s cubic-bezier(.22,1,.36,1)}',
   '.dip-icon{width:15px;height:15px;flex:none;display:block;position:relative;z-index:2;color:#eaf6ff;',
@@ -238,10 +263,12 @@ export const css = [
   '@keyframes dip-icon-spin{to{transform:rotate(360deg)}}',
   '@keyframes dip-aurora{0%,100%{opacity:.7}50%{opacity:1}}',
   '@keyframes dip-spark-pulse{0%,100%{opacity:.5;transform:translateY(-50%) scale(.95)}50%{opacity:1;transform:translateY(-50%) scale(1.15)}}',
+  '@keyframes dip-attract{0%,100%{box-shadow:' + SHADOW_IDLE + '}50%{box-shadow:' + SHADOW_ATTRACT + '}}',
+  '@keyframes dip-burst{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(3.4)}}',
 
   /* ---------- motion preferences: light freezes, legibility is untouched ---------- */
   '@media (prefers-reduced-motion: reduce){',
-  '.dip-root,.dip-ring,.dip-aurora,.dip-spark,.dip-icon,.dip-caret,.dip-chevron,.dip-undo{animation:none!important;',
+  '.dip-root,.dip-ring,.dip-aurora,.dip-spark,.dip-icon,.dip-caret,.dip-chevron,.dip-burst,.dip-undo{animation:none!important;',
   'transition-duration:.01ms!important}',
   '.dip-root:hover .dip-ring,.dip-root[data-busy="true"] .dip-ring{opacity:1}',
   // busy must still read as busy with motion off: a full-width static bar instead

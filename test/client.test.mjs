@@ -307,7 +307,7 @@ test('the chip carries both zones, light layers span it, and each zone ink is to
   // the chip's direct children: contained light, rim light, progress bar, main zone,
   // hairline divider, switch zone — one plate, two zones, nothing outside the glass
   const chipChildren = chip[0].children.map((c) => (typeof c === 'string' ? c : c.props.className))
-  assert.deepEqual(chipChildren, ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-btn', 'dip-divider', 'dip-chevron'])
+  assert.deepEqual(chipChildren, ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-btn', 'dip-divider', 'dip-chevron', 'dip-burst'])
 
   // inside the main zone: spark, icon, label (label is the topmost of the zone)
   const pill = renderer.root.findAllByProps({ className: 'dip-btn' })[0]
@@ -319,7 +319,7 @@ test('the chip carries both zones, light layers span it, and each zone ink is to
   const chevronChildren = chevron.children.map((c) => (typeof c === 'string' ? c : c.props.className))
   assert.deepEqual(chevronChildren, ['dip-caret'])
 
-  for (const decor of ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-spark', 'dip-divider', 'dip-caret']) {
+  for (const decor of ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-spark', 'dip-divider', 'dip-caret', 'dip-burst']) {
     const el = renderer.root.findAllByProps({ className: decor })[0]
     assert.equal(el.props['aria-hidden'], 'true', decor + ' is decoration, never content')
   }
@@ -343,7 +343,10 @@ test('the stylesheet keeps the guarantees the legibility check relies on', async
   assert.match(css, /RIM = 'conic-gradient\(/, 'the rim is width-independent')
   assert.match(css, /PLATE = 'linear-gradient\(135deg,#061024/, 'the plate is the dark navy glass')
   assert.match(css, /INK = '#f2f7ff'/, 'near-white ink is what makes it readable in both themes')
-  assert.ok(!/data-mode|prefers-color-scheme/.test(css), 'the plate does not invert per theme')
+  // the plate never swaps by theme or by a mode attribute on the chip itself —
+  // [data-mode] legitimately exists ONLY on the collapsed-state mode badge
+  assert.ok(!/prefers-color-scheme/.test(css), 'no theme-conditional styles')
+  assert.ok(!/\.dip-root\[data-mode|\.dip-btn\[data-mode/.test(css), 'the plate does not invert per theme')
   // and the palette is this plugin's own: cyan/blue with a gold accent, NOT the reference
   // plugin's violet/magenta ramp (its craft was borrowed, its colours were not)
   assert.ok(!/#8b5cf6|#e879f9|#a855f7|#7c3aed|#e879f9/.test(css), 'no borrowed violet/magenta hues')
@@ -369,11 +372,25 @@ test('the stylesheet keeps the guarantees the legibility check relies on', async
   assert.match(css, /\.dip-divider\{[^}]*linear-gradient\(180deg,transparent/, 'the divider fades at both ends')
   assert.match(css, /\.dip-chevron\{position:relative;z-index:2;flex:none;width:24px;height:28px;/,
     'the switch zone is a 24x28 hit target on the plate')
-  assert.match(css, /\.dip-caret\{display:block;font-size:10px;font-weight:600;line-height:1;/,
+  assert.match(css, /\.dip-caret\{display:block;flex:none;/,
     'the caret is drawn by code at a known size')
   assert.match(css, /CARET = '#cfe4ff'/, 'the caret speaks the same light ink as the label')
   // the switch zone carries its own light pool so the fusion reads as one object
   assert.match(css, /at 96% 46%,rgba\(43,108,255,\.44\)/, 'the switch zone owns a light pool')
+
+  // v7 collapse contract: content technique, never chip scaling
+  assert.match(css, /\.dip-label\{[^}]*max-width:0/, 'the label collapses to zero width')
+  // the expansion selector is built at runtime from the EXPANDED const — assert its
+  // definition and its use on the label, not a concatenated string that never exists
+  // in this file (the stylesheet test runs against the SOURCE text)
+  assert.match(css, /const EXPANDED = '\.dip-root:is\(:hover,:has\(:focus-visible\),\[data-busy="true"\]\)'/,
+    'expansion applies on hover, keyboard focus and busy')
+  assert.match(css, /EXPANDED \+ ' \.dip-label\{max-width:64px/, 'hover/focus/busy expand the label')
+  assert.ok(!/\.dip-root:hover\{[^}]*scale\(/.test(css), 'hover never scales the chip')
+  assert.ok(!/\.dip-root:active\{[^}]*scale\(/.test(css), 'press never scales the chip')
+  assert.match(css, /@keyframes dip-burst/, 'press has its shockwave')
+  assert.match(css, /\.dip-root:active \.dip-burst\{animation:dip-burst/, 'the burst fires on press')
+  assert.match(css, /@keyframes dip-attract/, 'the collapsed chip breathes while a draft waits')
 
   // the spark is a filled sprite: its box must stay clear of the label's box
   const sparkLeft = Number(/\.dip-spark\{position:absolute;left:(\d+)px/.exec(css)?.[1])

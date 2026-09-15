@@ -53,7 +53,7 @@ No preview-and-compare panel, no voice input, no self-updater, no multi-stage LL
 
 1. Type a draft — one line, colloquial, typos and all:
    > 就是那个 帮我把 src/host/config.ts 里的 maxRatioFor 改成 2.5 呗，用 `pnpm build` 验证一下
-2. Press **✦ 标准** (the **▾** on the same chip switches mode first if you like)
+2. Hover the **✦ star circle** in the composer toolbar — the chip expands leftward into 「✦ 标准 │ ⇄」 (collapsed by default, breathing while a draft waits)
 3. Wait 1–3 seconds; the draft becomes:
    > 把 `src/host/config.ts` 里的 `maxRatioFor` 改成 `2.5`；用 `pnpm build` 验证一下。
 4. Read the certificate: `已增强 · 保真 5/5 · 1.0x · 2.2s`
@@ -69,9 +69,10 @@ No preview-and-compare panel, no voice input, no self-updater, no multi-stage LL
 
 | State | Treatment |
 |---|---|
-| Idle | Dark glass chip — cyan pool over the main zone, electric-blue pool over the switch zone — full gradient rim, hairline divider |
-| Hover | Lifts 1.5px, scales 1.04, the rim brightens and laps slowly (3.4s); hovering the switch zone tints its glass |
-| Press | Settles to `scale(.94)`, brightness pulls back, the rim speeds up |
+| Collapsed (default) | 28px star circle, breathing while a draft waits (dark star when the draft is empty) |
+| Hover expand | Right edge pinned, expands leftward into the full split chip (the left neighbor reflows automatically, gaps constant) |
+| Expanded | Dark glass chip — cyan pool over the main zone, electric-blue pool over the switch zone — full gradient rim, hairline divider; the rim brightens and laps slowly (3.4s) |
+| Press | A **shockwave ring** expands from the star + one fast rim lap + an aurora pulse (zero geometry change) |
 | **Busy** | **Deliberately unlike hover**: a 2px long-tailed **comet** rim, a **sweeping energy bar** on the bottom edge, the whole chip **charging**, the icon spinning |
 | Disabled / focus | Desaturated and dimmed, rim extinguished; `focus-visible` keeps a ring |
 | Reduced motion | Animations stop; busy falls back to a **static full-width bar** |
