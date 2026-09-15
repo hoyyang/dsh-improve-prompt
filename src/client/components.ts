@@ -166,38 +166,39 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
 
   const isDisabled = !busy && (blocked || actions === null)
 
-  // Layer order matters and is documented in styles.ts. There is deliberately NO light
-  // layer outside the pill: every light source is contained inside it, and the label is
-  // the topmost element in the seat.
-  return React.createElement('div', { className: 'dip-root' },
-    React.createElement('span', {
-      className: 'dip-seat',
-      'data-busy': busy ? 'true' : 'false',
-    },
-    React.createElement('button', {
-      type: 'button',
-      className: 'dip-btn',
-      disabled: isDisabled,
-      'data-busy': busy ? 'true' : 'false',
-      'aria-label': t('buttonAria'),
-      title,
-      onClick,
-    },
-    React.createElement('span', { className: 'dip-aurora', 'aria-hidden': 'true' }),
-    React.createElement('span', { className: 'dip-ring', 'aria-hidden': 'true' }),
-    React.createElement('span', { className: 'dip-arc', 'aria-hidden': 'true' }),
-    React.createElement('span', { className: 'dip-spark', 'aria-hidden': 'true' }),
-    Sparkle(),
-    React.createElement('span', { className: 'dip-label' }, modeLabel),
-    ),
-    ),
-    React.createElement('button', {
-      type: 'button',
-      className: 'dip-chevron',
-      'aria-label': t('modeSwitchTitle'),
-      title: (mode === 'light' ? t('modeLightHint') : t('modeStandardHint')) + ' · ' + t('modeSwitchTitle'),
-      onClick: onCycleMode,
-    }, '\u25BE'),
+  // Layer order matters and is documented in styles.ts. The chip is .dip-root itself:
+  // one glass plate carrying two zones. Every light source is contained inside it, the
+  // hairline divider separates the two hit targets without touching a glyph, and each
+  // zone's ink is the topmost element of that zone.
+  return React.createElement('div', {
+    className: 'dip-root',
+    'data-busy': busy ? 'true' : 'false',
+  },
+  React.createElement('span', { className: 'dip-aurora', 'aria-hidden': 'true' }),
+  React.createElement('span', { className: 'dip-ring', 'aria-hidden': 'true' }),
+  React.createElement('span', { className: 'dip-arc', 'aria-hidden': 'true' }),
+  React.createElement('button', {
+    type: 'button',
+    className: 'dip-btn',
+    disabled: isDisabled,
+    'aria-label': t('buttonAria'),
+    title,
+    onClick,
+  },
+  React.createElement('span', { className: 'dip-spark', 'aria-hidden': 'true' }),
+  Sparkle(),
+  React.createElement('span', { className: 'dip-label' }, modeLabel),
+  ),
+  React.createElement('span', { className: 'dip-divider', 'aria-hidden': 'true' }),
+  React.createElement('button', {
+    type: 'button',
+    className: 'dip-chevron',
+    'aria-label': t('modeSwitchTitle'),
+    title: (mode === 'light' ? t('modeLightHint') : t('modeStandardHint')) + ' · ' + t('modeSwitchTitle'),
+    onClick: onCycleMode,
+  },
+  React.createElement('span', { className: 'dip-caret', 'aria-hidden': 'true' }, '\u25BE'),
+  ),
   )
 }
 

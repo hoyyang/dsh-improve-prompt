@@ -53,7 +53,7 @@ No preview-and-compare panel, no voice input, no self-updater, no multi-stage LL
 
 1. Type a draft — one line, colloquial, typos and all:
    > 就是那个 帮我把 src/host/config.ts 里的 maxRatioFor 改成 2.5 呗，用 `pnpm build` 验证一下
-2. Press **✦** (press the **⌄** beside it first to switch mode)
+2. Press **✦ 标准** (the **▾** on the same chip switches mode first if you like)
 3. Wait 1–3 seconds; the draft becomes:
    > 把 `src/host/config.ts` 里的 `maxRatioFor` 改成 `2.5`；用 `pnpm build` 验证一下。
 4. Read the certificate: `已增强 · 保真 5/5 · 1.0x · 2.2s`
@@ -69,8 +69,8 @@ No preview-and-compare panel, no voice input, no self-updater, no multi-stage LL
 
 | State | Treatment |
 |---|---|
-| Idle | Dark glass chip, full gradient rim, one cyan pool at the icon |
-| Hover | Lifts 1.5px, scales 1.04, the rim brightens and laps slowly (3.4s) |
+| Idle | Dark glass chip — cyan pool over the main zone, electric-blue pool over the switch zone — full gradient rim, hairline divider |
+| Hover | Lifts 1.5px, scales 1.04, the rim brightens and laps slowly (3.4s); hovering the switch zone tints its glass |
 | Press | Settles to `scale(.94)`, brightness pulls back, the rim speeds up |
 | **Busy** | **Deliberately unlike hover**: a 2px long-tailed **comet** rim, a **sweeping energy bar** on the bottom edge, the whole chip **charging**, the icon spinning |
 | Disabled / focus | Desaturated and dimmed, rim extinguished; `focus-visible` keeps a ring |
@@ -78,16 +78,18 @@ No preview-and-compare panel, no voice input, no self-updater, no multi-stage LL
 
 ### Label legibility: a hard requirement, measured in pixels
 
-No light source ever sits under the glyphs: the spark owns the icon slot (9px clearance), the rim is masked to the 1px border band, and the energy bar occupies only the bottom 2px (y25..27 against a label box of y8..20). The plate is never translucent, so the ratio holds in both themes and every state. Figures come from the **pixels of 3x screenshots**, because the plate is a gradient and computed colours cannot answer for it:
+No light source ever sits under the glyphs: the spark owns the icon slot (9px clearance), the rim is masked to the 1px border band, the energy bar occupies only the bottom 2px (y25..27 against glyph boxes at y8..20), and the divider keeps 7px off both edges. The plate is never translucent, so the ratio holds in both themes and every state — for the label AND the caret, measured separately from the **pixels of 3x screenshots**, because the plate is a gradient and computed colours cannot answer for it:
 
-| State | Dark | Light |
+| State | Label dark/light | Caret dark/light |
 |---|---|---|
-| Idle | 11.07:1 | 11.07:1 |
-| Hover | 9.83:1 | 15.36:1 |
-| Press | 8.77:1 | 14.53:1 |
-| Busy | 10.99:1 | 11.00:1 |
+| Idle | 8.45 / 8.45 | 9.97 / 9.97 |
+| Hover (main) | 8.78 / 8.77 | 10.57 / 10.49 |
+| Hover (switch) | 9.09 / 9.09 | 9.36 / 9.36 |
+| Press | 8.35 / 8.35 | 9.56 / 9.56 |
+| Busy | 8.47 / 8.47 | 10.21 / 10.21 |
+| Disabled | 5.43 / 5.43 | 11.56 / 11.56 |
 
-Worst case **8.77:1** (WCAG AA wants >= 4.5:1); disabled is measured too. `npm run harness:button` builds a comparison page with the real dsh-plan-board button beside this one, so every claim here is reproducible.
+Worst case **5.43:1** (disabled label; WCAG AA wants >= 4.5:1) — the caret is brightest exactly when the main action is disabled, because switching modes stays usable. `npm run harness:button` builds a comparison page with the real dsh-plan-board button beside this one, so every claim here is reproducible.
 
 ## Typical scenes
 
@@ -105,7 +107,7 @@ Worst case **8.77:1** (WCAG AA wants >= 4.5:1); disabled is measured too. `npm r
 - **Re-append notice** — only when the deterministic fallback fired: `已增强 · 保真 5/5 · 1.4x · 3.1s · 已回灌 src/a.ts`
 - **Preserved-details block** — appended to the rewrite on re-append: `保留原始细节 / Preserved original details:` followed by the exact strings
 - **Failure copy (draft untouched)** — "增强超时（60000ms），原文未改动" / "未找到可用模型：请先在设置里选默认模型" / "增强结果超出长度上限（…），已保留原文"
-- **Mode label** — the button shows the active mode (轻 / 标准); **⌄** switches it
+- **Mode label** — the button shows the active mode (轻 / 标准); the **▾** zone on the same glass chip switches it
 
 ## Real measured examples
 

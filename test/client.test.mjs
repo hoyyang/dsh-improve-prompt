@@ -298,21 +298,28 @@ test('a cancellation aborts the in-flight request instead of writing anything', 
   }
 })
 
-test('the pill contains every light layer, and the label is the topmost of them', async () => {
+test('the chip carries both zones, light layers span it, and each zone ink is topmost', async () => {
   const { button } = await boot()
   const renderer = await mount(button, seatProps())
 
-  const seat = renderer.root.findAllByProps({ className: 'dip-seat' })
-  assert.equal(seat.length, 1)
-  // the seat holds the pill and nothing else: no light layer lives outside the chip
-  const seatChildren = seat[0].children.map((c) => (typeof c === 'string' ? c : c.props.className))
-  assert.deepEqual(seatChildren, ['dip-btn'])
+  const chip = renderer.root.findAllByProps({ className: 'dip-root' })
+  assert.equal(chip.length, 1)
+  // the chip's direct children: contained light, rim light, progress bar, main zone,
+  // hairline divider, switch zone — one plate, two zones, nothing outside the glass
+  const chipChildren = chip[0].children.map((c) => (typeof c === 'string' ? c : c.props.className))
+  assert.deepEqual(chipChildren, ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-btn', 'dip-divider', 'dip-chevron'])
 
-  // inside the pill, the order is: contained light, rim light, progress bar, spark, icon, label
+  // inside the main zone: spark, icon, label (label is the topmost of the zone)
   const pill = renderer.root.findAllByProps({ className: 'dip-btn' })[0]
   const inner = pill.children.map((c) => (typeof c === 'string' ? c : c.props.className))
-  assert.deepEqual(inner, ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-spark', 'dip-icon', 'dip-label'])
-  for (const decor of ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-spark']) {
+  assert.deepEqual(inner, ['dip-spark', 'dip-icon', 'dip-label'])
+
+  // the switch zone owns its own ink span
+  const chevron = renderer.root.findAllByProps({ className: 'dip-chevron' })[0]
+  const chevronChildren = chevron.children.map((c) => (typeof c === 'string' ? c : c.props.className))
+  assert.deepEqual(chevronChildren, ['dip-caret'])
+
+  for (const decor of ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-spark', 'dip-divider', 'dip-caret']) {
     const el = renderer.root.findAllByProps({ className: decor })[0]
     assert.equal(el.props['aria-hidden'], 'true', decor + ' is decoration, never content')
   }
@@ -322,8 +329,8 @@ test('the stylesheet keeps the guarantees the legibility check relies on', async
   const fs = await import('node:fs')
   const css = fs.readFileSync(new URL('../src/client/styles.ts', import.meta.url), 'utf8')
 
-  // containment: the pill clips, so no inside layer can escape it, and the aurora is inset:0
-  assert.match(css, /\.dip-btn\{[^}]*overflow:hidden/)
+  // containment: the chip clips, so no inside layer can escape it, and the aurora is inset:0
+  assert.match(css, /\.dip-root\{[^}]*overflow:hidden/)
   assert.match(css, /\.dip-aurora\{position:absolute;inset:0/)
   assert.match(css, /\.dip-ring\{position:absolute;inset:0/)
   // no light layer outside the pill: no bloom rule, no blend modes
@@ -355,7 +362,18 @@ test('the stylesheet keeps the guarantees the legibility check relies on', async
   // and busy must be visibly different from hover, not just faster
   assert.match(css, /@keyframes dip-sweep/, 'busy has its own sweeping progress bar')
   assert.match(css, /@keyframes dip-charge/, 'busy has its own charging breath')
-  assert.match(css, /\.dip-btn\[data-busy="true"\]\{animation:dip-charge/, 'the chip itself charges while busy')
+  assert.match(css, /\.dip-root\[data-busy="true"\]\{animation:dip-charge/, 'the chip itself charges while busy')
+
+  // the fusion contract: a hairline divider and a real switch zone on the same plate
+  assert.match(css, /\.dip-divider\{position:relative;z-index:2;width:1px;/, 'the divider is a 1px hairline')
+  assert.match(css, /\.dip-divider\{[^}]*linear-gradient\(180deg,transparent/, 'the divider fades at both ends')
+  assert.match(css, /\.dip-chevron\{position:relative;z-index:2;flex:none;width:24px;height:28px;/,
+    'the switch zone is a 24x28 hit target on the plate')
+  assert.match(css, /\.dip-caret\{display:block;font-size:10px;font-weight:600;line-height:1;/,
+    'the caret is drawn by code at a known size')
+  assert.match(css, /CARET = '#cfe4ff'/, 'the caret speaks the same light ink as the label')
+  // the switch zone carries its own light pool so the fusion reads as one object
+  assert.match(css, /at 96% 46%,rgba\(43,108,255,\.44\)/, 'the switch zone owns a light pool')
 
   // the spark is a filled sprite: its box must stay clear of the label's box
   const sparkLeft = Number(/\.dip-spark\{position:absolute;left:(\d+)px/.exec(css)?.[1])
