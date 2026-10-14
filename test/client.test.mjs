@@ -121,18 +121,18 @@ test('the button renders enabled with a draft and disabled on an empty composer 
   const { button } = await boot()
 
   const enabled = await mount(button, seatProps())
-  const enabledBtn = enabled.root.findAllByType('button')[0]
+  const enabledBtn = enabled.root.findAllByProps({ className: 'dip-btn' })[0]
   assert.equal(enabledBtn.props.disabled, false)
   assert.equal(enabled.root.findAllByProps({ className: 'dip-chevron' }).length, 1)
 
   const empty = await mount(button, seatProps({ draft: '   ' }))
-  assert.equal(empty.root.findAllByType('button')[0].props.disabled, true)
+  assert.equal(empty.root.findAllByProps({ className: 'dip-btn' })[0].props.disabled, true)
 
   // A bare command has no body — nothing to rewrite. (A command WITH a body is
   // enhancable; that case is covered by the slash-command test below.)
   const command = await mount(button, seatProps({ draft: '/help' }))
-  assert.equal(command.root.findAllByType('button')[0].props.disabled, true)
-  assert.equal(command.root.findAllByType('button')[0].props.title, 'commandOnlyTitle')
+  assert.equal(command.root.findAllByProps({ className: 'dip-btn' })[0].props.disabled, true)
+  assert.equal(command.root.findAllByProps({ className: 'dip-btn' })[0].props.title, 'commandOnlyTitle')
 })
 
 test('a slash command with a body stays clickable, a bare command does not', async () => {
@@ -140,19 +140,19 @@ test('a slash command with a body stays clickable, a bare command does not', asy
 
   // The case that used to be blocked by mistake: /bugfix <正文> has a real body.
   const withBody = await mount(button, seatProps({ draft: '/bugfix ISS-202607-00090605A 填充后密码框被清空' }))
-  assert.equal(withBody.root.findAllByType('button')[0].props.disabled, false,
+  assert.equal(withBody.root.findAllByProps({ className: 'dip-btn' })[0].props.disabled, false,
     'a command carrying a body must be enhancable')
-  assert.equal(withBody.root.findAllByType('button')[0].props.title, 'buttonTitleCommand',
+  assert.equal(withBody.root.findAllByProps({ className: 'dip-btn' })[0].props.title, 'buttonTitleCommand',
     'and the tooltip says the prefix is preserved')
 
   // A command with nothing after it still has nothing to rewrite.
   const bare = await mount(button, seatProps({ draft: '/bugfix' }))
-  assert.equal(bare.root.findAllByType('button')[0].props.disabled, true)
+  assert.equal(bare.root.findAllByProps({ className: 'dip-btn' })[0].props.disabled, true)
   // The locale key is the contract; the copy itself lives in locales.ts.
-  assert.equal(bare.root.findAllByType('button')[0].props.title, 'commandOnlyTitle')
+  assert.equal(bare.root.findAllByProps({ className: 'dip-btn' })[0].props.title, 'commandOnlyTitle')
 
   const blankCommand = await mount(button, seatProps({ draft: '/bugfix   ' }))
-  assert.equal(blankCommand.root.findAllByType('button')[0].props.disabled, true)
+  assert.equal(blankCommand.root.findAllByProps({ className: 'dip-btn' })[0].props.disabled, true)
 })
 
 test('clicking on a slash-command draft sends only the body', async () => {
@@ -162,7 +162,7 @@ test('clicking on a slash-command draft sends only the body', async () => {
   globalThis.fetch = async (url, options) => { calls.push(JSON.parse(options.body)); return okResponse() }
   try {
     const renderer = await mount(button, seatProps({ draft: '/bugfix 把登录接口改快一点' }))
-    await TestRenderer.act(async () => { await renderer.root.findAllByType('button')[0].props.onClick() })
+    await TestRenderer.act(async () => { await renderer.root.findAllByProps({ className: 'dip-btn' })[0].props.onClick() })
     assert.equal(calls.length, 1)
     assert.equal(calls[0].text, '/bugfix 把登录接口改快一点', 'the full draft goes to the host, which owns the split')
   } finally {
@@ -178,7 +178,7 @@ test('the button still renders on a host that only provides a point-in-time inpu
     inputActions: { setDraft() {} },
     t: (key) => key,
   })
-  assert.equal(renderer.root.findAllByType('button')[0].props.disabled, false)
+  assert.equal(renderer.root.findAllByProps({ className: 'dip-btn' })[0].props.disabled, false)
 })
 
 test('clicking posts the draft with its mode and writes the enhanced text back', async () => {
@@ -189,7 +189,7 @@ test('clicking posts the draft with its mode and writes the enhanced text back',
   globalThis.fetch = async (url, options) => { calls.push({ url, body: JSON.parse(options.body) }); return okResponse() }
   try {
     const renderer = await mount(button, seatProps({ inputActions: { setDraft: (text) => { written = text } } }))
-    await TestRenderer.act(async () => { await renderer.root.findAllByType('button')[0].props.onClick() })
+    await TestRenderer.act(async () => { await renderer.root.findAllByProps({ className: 'dip-btn' })[0].props.onClick() })
 
     assert.equal(calls.length, 1)
     assert.equal(calls[0].url, '/dsh-improve-prompt/api/improve')
@@ -209,7 +209,7 @@ test('a failed call never touches the draft and surfaces localized copy', async 
   globalThis.fetch = async () => ({ json: async () => ({ ok: false, code: 'LENGTH_EXCEEDED', message: 'host copy' }) })
   try {
     const renderer = await mount(button, seatProps({ inputActions: { setDraft: (text) => { written = text } } }))
-    await TestRenderer.act(async () => { await renderer.root.findAllByType('button')[0].props.onClick() })
+    await TestRenderer.act(async () => { await renderer.root.findAllByProps({ className: 'dip-btn' })[0].props.onClick() })
     assert.equal(written, null, 'the draft must not be touched on failure')
 
     // The status bar renders the LOCALIZED copy for a registered code — the harness
@@ -224,26 +224,86 @@ test('a failed call never touches the draft and surfaces localized copy', async 
   }
 })
 
-test('the status bar shows the certificate and undo restores the original draft', async () => {
+/** Mount the composer button over a live draft that setDraft really rewrites. */
+async function mountLive(button, initial) {
+  const live = { draft: initial, sent: [] }
+  const actions = { setDraft: (text) => { live.draft = text } }
+  const props = () => seatProps({ draft: live.draft, inputActions: actions })
+  live.renderer = await mount(button, props())
+  live.rerender = async () => { await TestRenderer.act(async () => { live.renderer.update(React.createElement(button, props())) }) }
+  live.find = (className) => live.renderer.root.findAllByProps({ className })
+  return live
+}
+
+const REFINED = '为登录接口增加按 IP 的限流，每分钟 60 次。'
+
+test('after a refine the composer button becomes the Revert | Retry capsule', async () => {
   const { button, bar } = await boot()
-  let written = null
   const originalFetch = globalThis.fetch
   globalThis.fetch = async () => okResponse({ meta: { contextUsed: 'anaphora' } })
   try {
-    const actions = { setDraft: (text) => { written = text } }
-    const renderer = await mount(button, seatProps({ inputActions: actions }))
-    await TestRenderer.act(async () => { await renderer.root.findAllByType('button')[0].props.onClick() })
-    assert.equal(written, '为登录接口增加按 IP 的限流，每分钟 60 次。')
+    const live = await mountLive(button, '把那个接口加上限流')
+    await TestRenderer.act(async () => { await live.find('dip-btn')[0].props.onClick() })
+    assert.equal(live.draft, REFINED)
+    await live.rerender()
+
+    assert.equal(live.find('dip-btn').length, 0, 'the star is replaced while the refined text is untouched')
+    assert.equal(live.find('dip-revert').length, 1)
+    assert.equal(live.find('dip-retry').length, 1)
+    assert.equal(live.find('dip-capsule-icon').length, 2, 'each half carries its icon')
 
     const barRenderer = await mount(bar, { sessionId: 's1', t: (key) => key })
     const shown = JSON.stringify(barRenderer.toJSON())
     assert.match(shown, /dip-bar/)
     assert.match(shown, /1\.4x/)
     assert.match(shown, /contextTag/)
+    assert.doesNotMatch(shown, /dip-revert|dip-retry/, 'the bar no longer carries the buttons')
 
-    const undo = barRenderer.root.findAllByProps({ className: 'dip-undo' })[0]
-    await TestRenderer.act(async () => { undo.props.onClick() })
-    assert.equal(written, '把那个接口加上限流', 'undo puts the original draft back')
+    await TestRenderer.act(async () => { live.find('dip-revert')[0].props.onClick() })
+    assert.equal(live.draft, '把那个接口加上限流', 'Revert puts the original draft back')
+    await live.rerender()
+    assert.equal(live.find('dip-btn').length, 1, 'after Revert the star returns')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('editing the refined draft returns the composer button to the star', async () => {
+  const { button } = await boot()
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => okResponse()
+  try {
+    const live = await mountLive(button, '把那个接口加上限流')
+    await TestRenderer.act(async () => { await live.find('dip-btn')[0].props.onClick() })
+    await live.rerender()
+    assert.equal(live.find('dip-revert').length, 1)
+
+    live.draft = REFINED + ' 另外加日志'
+    await live.rerender()
+    assert.equal(live.find('dip-revert').length, 0)
+    assert.equal(live.find('dip-btn').length, 1)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('Retry regenerates from the original draft, not the refined text', async () => {
+  const { button } = await boot()
+  const sent = []
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (_url, init) => {
+    sent.push(JSON.parse(init.body).text)
+    return okResponse()
+  }
+  try {
+    const live = await mountLive(button, '把那个接口加上限流')
+    await TestRenderer.act(async () => { await live.find('dip-btn')[0].props.onClick() })
+    await live.rerender()
+    await TestRenderer.act(async () => { live.find('dip-retry')[0].props.onClick(); await new Promise((r) => setTimeout(r, 0)) })
+
+    assert.equal(sent.length, 2, 'Retry issues a second request')
+    assert.equal(sent[1], '把那个接口加上限流', 'Retry sends the pre-refine draft')
+    assert.equal(live.draft, REFINED)
   } finally {
     globalThis.fetch = originalFetch
   }
@@ -255,7 +315,7 @@ test('an unregistered error code falls back to the host message', async () => {
   globalThis.fetch = async () => ({ json: async () => ({ ok: false, code: 'SOMETHING_NEW', message: 'host copy' }) })
   try {
     const renderer = await mount(button, seatProps({ inputActions: { setDraft() {} } }))
-    await TestRenderer.act(async () => { await renderer.root.findAllByType('button')[0].props.onClick() })
+    await TestRenderer.act(async () => { await renderer.root.findAllByProps({ className: 'dip-btn' })[0].props.onClick() })
     const barRenderer = await mount(bar, { sessionId: 's1', t: (key) => key })
     assert.match(JSON.stringify(barRenderer.toJSON()), /host copy/)
   } finally {
@@ -276,7 +336,9 @@ test('the mode chevron switches between light and standard and remembers it', as
   const chevron = buttons.find((b) => b.props.className === 'dip-chevron')
   await TestRenderer.act(async () => { chevron.props.onClick() })
   assert.equal(globalThis.window.localStorage.getItem('dsh-improve-prompt:mode'), 'light')
-  assert.match(JSON.stringify(renderer.toJSON()), /modeLight/, 'the label follows the stored mode')
+  const active = renderer.root.findAllByProps({ className: 'dip-label-text' }).filter((n) => n.props['data-active'] === 'true')
+  assert.deepEqual(active.map((n) => n.props.children), ['modeLight'], 'the label follows the stored mode')
+  assert.equal(renderer.root.findAllByProps({ className: 'dip-label-text' }).length, 2, 'both names stay rendered so the width never changes')
 })
 
 test('a cancellation aborts the in-flight request instead of writing anything', async () => {
@@ -290,7 +352,7 @@ test('a cancellation aborts the in-flight request instead of writing anything', 
   }
   try {
     const renderer = await mount(button, seatProps({ inputActions: { setDraft: (text) => { written = text } } }))
-    await TestRenderer.act(async () => { await renderer.root.findAllByType('button')[0].props.onClick() })
+    await TestRenderer.act(async () => { await renderer.root.findAllByProps({ className: 'dip-btn' })[0].props.onClick() })
     assert.ok(seenSignal !== null && seenSignal.aborted === false, 'the request carries a live AbortSignal')
     assert.equal(written, '为登录接口增加按 IP 的限流，每分钟 60 次。')
   } finally {
@@ -304,10 +366,10 @@ test('the chip carries both zones, light layers span it, and each zone ink is to
 
   const chip = renderer.root.findAllByProps({ className: 'dip-root' })
   assert.equal(chip.length, 1)
-  // the chip's direct children: contained light, rim light, progress bar, main zone,
-  // hairline divider, switch zone — one plate, two zones, nothing outside the glass
+  // the chip's direct children: contained light, rim light, progress bar, switch zone,
+  // hairline divider, main zone (rightmost, under the pinned edge) — one plate, two zones
   const chipChildren = chip[0].children.map((c) => (typeof c === 'string' ? c : c.props.className))
-  assert.deepEqual(chipChildren, ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-btn', 'dip-divider', 'dip-chevron', 'dip-burst'])
+  assert.deepEqual(chipChildren, ['dip-aurora', 'dip-ring', 'dip-arc', 'dip-chevron', 'dip-divider', 'dip-btn', 'dip-burst'])
 
   // inside the main zone: spark, icon, label (label is the topmost of the zone)
   const pill = renderer.root.findAllByProps({ className: 'dip-btn' })[0]
@@ -376,7 +438,7 @@ test('the stylesheet keeps the guarantees the legibility check relies on', async
     'the caret is drawn by code at a known size')
   assert.match(css, /CARET = '#cfe4ff'/, 'the caret speaks the same light ink as the label')
   // the switch zone carries its own light pool so the fusion reads as one object
-  assert.match(css, /at 96% 46%,rgba\(43,108,255,\.44\)/, 'the switch zone owns a light pool')
+  assert.match(css, /at 4% 46%,rgba\(43,108,255,\.44\)/, 'the switch zone owns a light pool')
 
   // v7 collapse contract: content technique, never chip scaling
   assert.match(css, /\.dip-label\{[^}]*max-width:0/, 'the label collapses to zero width')

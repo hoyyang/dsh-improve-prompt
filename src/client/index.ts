@@ -3,7 +3,7 @@
  *
  * Two slot entries and nothing else:
  * - `conversation.input.right` — the sparkle button in the composer tool row.
- * - `conversation.input.dock` — the "improved · certificate · undo" bar.
+ * - `conversation.input.dock` — the "improved · certificate · Revert | Retry" bar.
  *
  * Slot contract verified against @deepseek-ai/dsh-client-ui-conversation 0.1.5-rc.1:
  * a session-scoped entry receives `useInput` + `inputActions` (the standard session
@@ -98,7 +98,7 @@ export function apply(ctx: ClientContext): void {
     }
   }, 'dsh-improve-prompt: composer button')
 
-  // Above the composer card: the certificate and the undo affordance.
+  // Above the composer card: the certificate and the Revert | Retry capsule.
   ctx.effect(() => {
     try {
       return ctx.slots.inject('conversation.input.dock', function* () {

@@ -1,5 +1,6 @@
 /**
- * The two visible pieces: the composer button and the status/undo bar.
+ * The two visible pieces: the composer button (star, or Revert | Retry after a refine)
+ * and the status bar.
  *
  * @module dsh-improve-prompt/client/components
  */
@@ -33,6 +34,19 @@ const API = '/dsh-improve-prompt/api/improve'
  * instance, and every instance wants the same gradient), and it is only safe to use a
  * fixed bright gradient because the chip's plate is always dark in both themes.
  */
+/** Stroke paths (12x12 grid) for the capsule glyphs: a back-arrow for Revert, a circular arrow for Retry. */
+const CAPSULE_ICON_PATH = {
+  revert: 'M4.6 2.2L1.8 5L4.6 7.8M1.8 5H7.4A3 3 0 0 1 7.4 11H5.2',
+  retry: 'M10.2 6A4.2 4.2 0 1 1 8.6 2.7M8.9 0.9L9.2 3.2L6.9 3.6',
+} as const
+
+/** Small stroke glyph for one half of the Revert | Retry capsule; inherits the label colour. */
+function CapsuleIcon(kind: keyof typeof CAPSULE_ICON_PATH): React.ReactElement {
+  return React.createElement('svg', { className: 'dip-capsule-icon', viewBox: '0 0 12 12', width: '12', height: '12', 'aria-hidden': 'true', focusable: 'false' },
+    React.createElement('path', { d: CAPSULE_ICON_PATH[kind], fill: 'none', stroke: 'currentColor', strokeWidth: '1.4', strokeLinecap: 'round', strokeLinejoin: 'round' }),
+  )
+}
+
 function Sparkle(): React.ReactElement {
   return React.createElement('svg', { className: 'dip-icon', viewBox: '0 0 16 16', 'aria-hidden': 'true', focusable: 'false' },
     React.createElement('defs', null,
@@ -73,8 +87,72 @@ function useSessionState(sessionId: string | undefined): number {
 }
 
 /**
+ * Send one draft to the host and write the result into the composer.
+ *
+ * Shared by the composer button and the status bar's Retry, so both follow the same
+ * state transitions: busy -> done (draft replaced, `backup` keeps `text`) or
+ * busy -> error (draft untouched). A slash-command draft with no body is ignored.
+ *
+ * @param sessionId - the session whose composer is rewritten.
+ * @param text - the draft to enhance; becomes the Revert target.
+ * @param actions - composer actions used to write the result.
+ * @param t - localized copy lookup for failure messages.
+ */
+function runImprove(sessionId: string, text: string, actions: InputActionsFace, t: TFn): void {
+  if (splitCommand(text).body === '') return
+  const current = storeFor(sessionId)
+  const controller = new AbortController()
+  current.controller = controller
+  current.phase = 'busy'
+  current.error = null
+  current.backup = text
+  current.meta = null
+  current.enhanced = ''
+  notify(sessionId)
+
+  void (async () => {
+    try {
+      const response = await fetch(API, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId, text, mode: getMode() }),
+        signal: controller.signal,
+      })
+      const data = (await response.json()) as {
+        ok?: boolean; code?: string; message?: string; text?: string; meta?: Meta
+      }
+      const latest = storeFor(sessionId)
+      if (data.ok === true && typeof data.text === 'string' && data.text !== '') {
+        latest.enhanced = data.text
+        latest.meta = data.meta !== undefined ? data.meta : null
+        latest.phase = 'done'
+        latest.controller = null
+        actions.setDraft(data.text)
+        notify(sessionId)
+        return
+      }
+      const code = typeof data.code === 'string' ? data.code : 'UNKNOWN'
+      const key = 'err_' + code
+      const localized = t(key)
+      latest.phase = 'error'
+      latest.error = localized !== key ? localized : (typeof data.message === 'string' && data.message !== '' ? data.message : t('err_UNKNOWN'))
+      latest.controller = null
+      notify(sessionId)
+    } catch (error) {
+      const latest = storeFor(sessionId)
+      latest.controller = null
+      const aborted = error instanceof DOMException && error.name === 'AbortError'
+      latest.phase = 'error'
+      latest.error = aborted ? t('err_ABORTED') : t('err_UPSTREAM')
+      notify(sessionId)
+    }
+  })()
+}
+
+/**
  * Composer button: one click replaces the draft in place; a second click while
- * busy cancels. Disabled on an empty composer or a slash command.
+ * busy cancels. Disabled on an empty composer or a slash command. While the composer
+ * still holds the refined text it renders as the Revert | Retry capsule instead.
  */
 export function ImproveButton(props: SeatProps): React.ReactElement | null {
   const t = props.t
@@ -92,7 +170,7 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
   const actions = props.inputActions !== undefined ? props.inputActions : (state !== null ? state.actions : null)
   const mode: Mode = getMode()
 
-  // Keep the store's action face fresh so the status bar can undo without props.
+  // Keep the store's action face fresh so Revert/Retry can write the draft.
   if (state !== null && props.inputActions !== undefined && state.actions !== props.inputActions) {
     state.actions = props.inputActions
   }
@@ -104,54 +182,7 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
       if (current.controller !== null) current.controller.abort()
       return
     }
-    const text = draft
-    if (splitCommand(text).body === '') return
-    const controller = new AbortController()
-    current.controller = controller
-    current.phase = 'busy'
-    current.error = null
-    current.backup = text
-    current.meta = null
-    current.enhanced = ''
-    notify(sessionId)
-
-    void (async () => {
-      try {
-        const response = await fetch(API, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionId, text, mode: getMode() }),
-          signal: controller.signal,
-        })
-        const data = (await response.json()) as {
-          ok?: boolean; code?: string; message?: string; text?: string; meta?: Meta
-        }
-        const latest = storeFor(sessionId)
-        if (data.ok === true && typeof data.text === 'string' && data.text !== '') {
-          latest.enhanced = data.text
-          latest.meta = data.meta !== undefined ? data.meta : null
-          latest.phase = 'done'
-          latest.controller = null
-          actions.setDraft(data.text)
-          notify(sessionId)
-          return
-        }
-        const code = typeof data.code === 'string' ? data.code : 'UNKNOWN'
-        const key = 'err_' + code
-        const localized = t(key)
-        latest.phase = 'error'
-        latest.error = localized !== key ? localized : (typeof data.message === 'string' && data.message !== '' ? data.message : t('err_UNKNOWN'))
-        latest.controller = null
-        notify(sessionId)
-      } catch (error) {
-        const latest = storeFor(sessionId)
-        latest.controller = null
-        const aborted = error instanceof DOMException && error.name === 'AbortError'
-        latest.phase = 'error'
-        latest.error = aborted ? t('err_ABORTED') : t('err_UPSTREAM')
-        notify(sessionId)
-      }
-    })()
+    runImprove(sessionId, draft, actions, t)
   }, [sessionId, actions, draft, t])
 
   const onCycleMode = React.useCallback(() => {
@@ -166,12 +197,47 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
 
   const isDisabled = !busy && (blocked || actions === null)
 
+  // Refined = the composer still holds exactly the text we wrote. Editing or sending
+  // the draft changes it, which returns the chip to the star with no extra bookkeeping.
+  const refined = state !== null && !busy && state.phase === 'done' && state.enhanced !== '' && draft === state.enhanced
+
+  const onRevert = React.useCallback(() => {
+    if (sessionId === undefined) return
+    const current = storeFor(sessionId)
+    const backup = current.backup
+    clear(sessionId)
+    if (actions !== null) actions.setDraft(backup)
+  }, [sessionId, actions])
+
+  // Retry regenerates from the ORIGINAL draft (the Revert target), not from the
+  // current refined text, so repeated retries never compound rewrites.
+  const onRetry = React.useCallback(() => {
+    if (sessionId === undefined || actions === null) return
+    runImprove(sessionId, storeFor(sessionId).backup, actions, t)
+  }, [sessionId, actions, t])
+
+  if (refined) {
+    // After a refine the chip itself becomes the Revert | Retry capsule: the same glass
+    // plate, two halves split by the hairline divider, still right-pinned.
+    return React.createElement('div', { className: 'dip-root', 'data-refined': 'true', role: 'group' },
+      React.createElement('span', { className: 'dip-aurora', 'aria-hidden': 'true' }),
+      React.createElement('span', { className: 'dip-ring', 'aria-hidden': 'true' }),
+      React.createElement('button', { type: 'button', className: 'dip-revert', title: t('revertTitle'), onClick: onRevert }, CapsuleIcon('revert'), t('revert')),
+      React.createElement('span', { className: 'dip-divider', 'aria-hidden': 'true' }),
+      React.createElement('button', { type: 'button', className: 'dip-retry', title: t('retryTitle'), onClick: onRetry }, CapsuleIcon('retry'), t('retry')),
+    )
+  }
+
   // Layer order matters and is documented in styles.ts. The chip is .dip-root itself:
   // one glass plate carrying two zones, collapsed to the star circle by default and
   // expanding on hover/focus/busy with its RIGHT edge pinned (the host's .trailing
   // cluster is margin-left:auto, so only dsh-concise on the left reflows — measured,
   // not assumed). The mode dot keeps the collapsed circle state-aware; the burst is
   // the press shockwave that replaced geometry scaling.
+  // The switch zone comes FIRST: expansion grows leftwards from the pinned right edge,
+  // so whatever sits rightmost lands under a pointer that hovered the collapsed star.
+  // With the main zone rightmost, a direct click on the star still hits the main action
+  // instead of cycling the mode (user report).
   return React.createElement('div', {
     className: 'dip-root',
     'data-busy': busy ? 'true' : 'false',
@@ -179,6 +245,18 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
   React.createElement('span', { className: 'dip-aurora', 'aria-hidden': 'true' }),
   React.createElement('span', { className: 'dip-ring', 'aria-hidden': 'true' }),
   React.createElement('span', { className: 'dip-arc', 'aria-hidden': 'true' }),
+  React.createElement('button', {
+    type: 'button',
+    className: 'dip-chevron',
+    'aria-label': t('modeSwitchTitle'),
+    title: (mode === 'light' ? t('modeLightHint') : t('modeStandardHint')) + ' · ' + t('modeSwitchTitle'),
+    onClick: onCycleMode,
+  },
+  React.createElement('svg', { className: 'dip-caret', viewBox: '0 0 12 10', width: '12', height: '10', 'aria-hidden': 'true', focusable: 'false' },
+  React.createElement('path', { d: 'M1.2 2.7H10.8M8.9 0.9L10.8 2.7L8.9 4.5M10.8 7.3H1.2M3.1 5.5L1.2 7.3L3.1 9.1', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'round', strokeLinejoin: 'round' }),
+  ),
+  ),
+  React.createElement('span', { className: 'dip-divider', 'aria-hidden': 'true' }),
   React.createElement('button', {
     type: 'button',
     className: 'dip-btn',
@@ -189,18 +267,12 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
   },
   React.createElement('span', { className: 'dip-spark', 'aria-hidden': 'true' }),
   Sparkle(),
-  React.createElement('span', { className: 'dip-label' }, modeLabel),
-  ),
-  React.createElement('span', { className: 'dip-divider', 'aria-hidden': 'true' }),
-  React.createElement('button', {
-    type: 'button',
-    className: 'dip-chevron',
-    'aria-label': t('modeSwitchTitle'),
-    title: (mode === 'light' ? t('modeLightHint') : t('modeStandardHint')) + ' · ' + t('modeSwitchTitle'),
-    onClick: onCycleMode,
-  },
-  React.createElement('svg', { className: 'dip-caret', viewBox: '0 0 12 10', width: '12', height: '10', 'aria-hidden': 'true', focusable: 'false' },
-  React.createElement('path', { d: 'M1.2 2.7H10.8M8.9 0.9L10.8 2.7L8.9 4.5M10.8 7.3H1.2M3.1 5.5L1.2 7.3L3.1 9.1', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'round', strokeLinejoin: 'round' }),
+  // Both mode names share one grid cell so the label is always as wide as the longer
+  // one: switching mode must not resize the chip, or the pointer falls off the hover
+  // boundary and the chip collapses mid-interaction (user report).
+  React.createElement('span', { className: 'dip-label' },
+    React.createElement('span', { className: 'dip-label-text', 'data-active': mode === 'standard' ? 'true' : 'false', 'aria-hidden': mode === 'standard' ? undefined : 'true' }, t('modeStandard')),
+    React.createElement('span', { className: 'dip-label-text', 'data-active': mode === 'light' ? 'true' : 'false', 'aria-hidden': mode === 'light' ? undefined : 'true' }, t('modeLight')),
   ),
   ),
   React.createElement('span', { className: 'dip-burst', 'aria-hidden': 'true' }),
@@ -220,7 +292,7 @@ function certificate(meta: Meta, t: TFn): string {
 }
 
 /**
- * Status and undo bar, rendered above the composer card. Reads the store directly,
+ * Status bar, rendered above the composer card. Reads the store directly,
  * so it needs no slot props beyond the session id.
  */
 export function StatusBar(props: { sessionId?: string; t: TFn }): React.ReactElement | null {
@@ -229,16 +301,23 @@ export function StatusBar(props: { sessionId?: string; t: TFn }): React.ReactEle
   const state = sessionId !== undefined ? storeFor(sessionId) : null
   const phase = state !== null ? state.phase : 'idle'
   const token = state !== null ? [state.enhanced.length, state.error ?? '', state.meta !== null ? state.meta.elapsedMs : 0].join(':') : ''
+  const [hiddenToken, setHiddenToken] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     if (sessionId === undefined) return undefined
     if (phase !== 'done' && phase !== 'error') return undefined
     const ms = phase === 'done' ? 8000 : 12000
-    const timer = window.setTimeout(() => { clear(sessionId) }, ms)
+    // A finished refine only hides the bar: clearing the store would drop the backup the
+    // composer capsule needs for Revert/Retry until the draft is edited or sent.
+    const timer = window.setTimeout(() => {
+      if (phase === 'done') setHiddenToken(token)
+      else clear(sessionId)
+    }, ms)
     return () => { window.clearTimeout(timer) }
   }, [sessionId, phase, token])
 
   if (sessionId === undefined || state === null || phase === 'idle' || phase === 'busy') return null
+  if (phase === 'done' && hiddenToken === token) return null
 
   if (phase === 'error') {
     return React.createElement('div', { className: 'dip-bar', 'data-kind': 'error' },
@@ -247,18 +326,11 @@ export function StatusBar(props: { sessionId?: string; t: TFn }): React.ReactEle
   }
 
   const meta = state.meta
-  const onUndo = (): void => {
-    const actions = state.actions
-    const backup = state.backup
-    clear(sessionId)
-    if (actions !== null) actions.setDraft(backup)
-  }
 
   const note = meta !== null && meta.note !== '' ? t('preserved') + ' ' + meta.note : ''
 
   return React.createElement('div', { className: 'dip-bar' },
     React.createElement('span', { className: 'dip-bar-text' },
       t('done') + (meta !== null ? ' \u00b7 ' + certificate(meta, t) : '') + (note !== '' ? ' \u00b7 ' + note : '')),
-    React.createElement('button', { type: 'button', className: 'dip-undo', title: t('undoTitle'), onClick: onUndo }, t('undo')),
   )
 }
