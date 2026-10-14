@@ -14,7 +14,7 @@
  * - **the plate is always dark** — `#061024 -> #0c2144` glass, in both themes.
  * - **the border is a conic gradient** — width-independent, every hue always on the rim.
  * - **the aurora lives inside the chip** — a cyan pool over the main action, an
- *   electric-blue pool over the switch zone, gold catching the lower edge.
+ *   electric-blue pool over the switch zone (left), gold catching the lower edge.
  * - **collapse = content technique, not squish** — the label, divider and switch
  *   zone animate `max-width`/`opacity` (the dsh-concise label craft), the main
  *   zone animates `gap`/`padding`; the pill radius morphs circle <-> pill for free.
@@ -30,9 +30,9 @@
  *   `.dip-aurora`  — contained washes, `z-index:0`, `pointer-events:none`
  *   `.dip-ring`    — conic gradient masked to the 1px border band, `z-index:1`
  *   `.dip-arc`     — busy-only energy bar on the bottom 2px, `z-index:1`
- *   `.dip-btn`     — main zone, `z-index:2`; spark (icon slot) + icon + label inside
+ *   `.dip-chevron` — switch zone (left), `z-index:2`; `.dip-caret` glyph inside
  *   `.dip-divider` — hairline, `z-index:2`
- *   `.dip-chevron` — switch zone, `z-index:2`; `.dip-caret` glyph inside
+ *   `.dip-btn`     — main zone (right, under the pinned edge), `z-index:2`; spark (icon slot) + icon + label inside
  *   `.dip-burst`   — press shockwave, `z-index:1`, one-shot on `:active`
  *
  * No light source ever sits under a glyph: the spark owns the icon slot, the rim is
@@ -67,10 +67,10 @@ const PLATE = 'linear-gradient(135deg,#061024 0%,#08182e 52%,#0c2144 100%)'
 const RIM = 'conic-gradient(from 200deg at 50% 50%,#22d3ee 0%,#38bdf8 15%,#2b6cff 38%,#1d4ed8 52%,#f5c542 80%,#ffe9a8 90%,#22d3ee 100%)'
 /** Contained light: a pool per zone plus the gold lower edge, all inside the chip. */
 const AURORA = [
-  'radial-gradient(30% 62% at 16% 48%,rgba(34,211,238,.42),transparent 70%)',
-  'radial-gradient(28% 62% at 62% 42%,rgba(37,99,235,.42),transparent 72%)',
-  // the switch zone carries its own pool: the divider is not the end of the glass
-  'radial-gradient(30% 64% at 96% 46%,rgba(43,108,255,.44),transparent 74%)',
+  'radial-gradient(30% 62% at 44% 48%,rgba(34,211,238,.42),transparent 70%)',
+  'radial-gradient(28% 62% at 74% 42%,rgba(37,99,235,.42),transparent 72%)',
+  // the switch zone (left edge) carries its own pool: the divider is not the end of the glass
+  'radial-gradient(30% 64% at 4% 46%,rgba(43,108,255,.44),transparent 74%)',
   'radial-gradient(34% 70% at 62% 116%,rgba(245,197,66,.26),transparent 74%)',
   // the body stays dark between the pools: that contrast is what reads as glass, not jelly
   'radial-gradient(130% 160% at 50% 50%,rgba(6,20,48,.66),transparent 80%)',
@@ -189,7 +189,8 @@ export const css = [
   '.dip-chevron:active .dip-caret{transform:translateY(1px) scale(.88)}',
 
   /* ---------- press: energy, not geometry ---------- */
-  '.dip-burst{position:absolute;left:16px;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;',
+  // Centred on the expanded star: switch 24px + divider 1px + main left padding 9px + half icon 7.5px.
+  '.dip-burst{position:absolute;left:41px;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;',
   'border-radius:999px;pointer-events:none;z-index:1;opacity:0;',
   'border:2px solid rgba(125,211,252,.85);transform:scale(.4)}',
   '.dip-root:active .dip-burst{animation:dip-burst .5s cubic-bezier(.2,.6,.35,1)}',

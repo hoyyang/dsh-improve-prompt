@@ -172,6 +172,10 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
   // cluster is margin-left:auto, so only dsh-concise on the left reflows — measured,
   // not assumed). The mode dot keeps the collapsed circle state-aware; the burst is
   // the press shockwave that replaced geometry scaling.
+  // The switch zone comes FIRST: expansion grows leftwards from the pinned right edge,
+  // so whatever sits rightmost lands under a pointer that hovered the collapsed star.
+  // With the main zone rightmost, a direct click on the star still hits the main action
+  // instead of cycling the mode (user report).
   return React.createElement('div', {
     className: 'dip-root',
     'data-busy': busy ? 'true' : 'false',
@@ -179,6 +183,18 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
   React.createElement('span', { className: 'dip-aurora', 'aria-hidden': 'true' }),
   React.createElement('span', { className: 'dip-ring', 'aria-hidden': 'true' }),
   React.createElement('span', { className: 'dip-arc', 'aria-hidden': 'true' }),
+  React.createElement('button', {
+    type: 'button',
+    className: 'dip-chevron',
+    'aria-label': t('modeSwitchTitle'),
+    title: (mode === 'light' ? t('modeLightHint') : t('modeStandardHint')) + ' · ' + t('modeSwitchTitle'),
+    onClick: onCycleMode,
+  },
+  React.createElement('svg', { className: 'dip-caret', viewBox: '0 0 12 10', width: '12', height: '10', 'aria-hidden': 'true', focusable: 'false' },
+  React.createElement('path', { d: 'M1.2 2.7H10.8M8.9 0.9L10.8 2.7L8.9 4.5M10.8 7.3H1.2M3.1 5.5L1.2 7.3L3.1 9.1', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'round', strokeLinejoin: 'round' }),
+  ),
+  ),
+  React.createElement('span', { className: 'dip-divider', 'aria-hidden': 'true' }),
   React.createElement('button', {
     type: 'button',
     className: 'dip-btn',
@@ -190,18 +206,6 @@ export function ImproveButton(props: SeatProps): React.ReactElement | null {
   React.createElement('span', { className: 'dip-spark', 'aria-hidden': 'true' }),
   Sparkle(),
   React.createElement('span', { className: 'dip-label' }, modeLabel),
-  ),
-  React.createElement('span', { className: 'dip-divider', 'aria-hidden': 'true' }),
-  React.createElement('button', {
-    type: 'button',
-    className: 'dip-chevron',
-    'aria-label': t('modeSwitchTitle'),
-    title: (mode === 'light' ? t('modeLightHint') : t('modeStandardHint')) + ' · ' + t('modeSwitchTitle'),
-    onClick: onCycleMode,
-  },
-  React.createElement('svg', { className: 'dip-caret', viewBox: '0 0 12 10', width: '12', height: '10', 'aria-hidden': 'true', focusable: 'false' },
-  React.createElement('path', { d: 'M1.2 2.7H10.8M8.9 0.9L10.8 2.7L8.9 4.5M10.8 7.3H1.2M3.1 5.5L1.2 7.3L3.1 9.1', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'round', strokeLinejoin: 'round' }),
-  ),
   ),
   React.createElement('span', { className: 'dip-burst', 'aria-hidden': 'true' }),
   )
