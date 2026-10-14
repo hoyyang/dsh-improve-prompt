@@ -3,7 +3,9 @@
  *
  * Two slot entries and nothing else:
  * - `conversation.input.right` — the sparkle button in the composer tool row.
- * - `conversation.input.dock` — the "improved · certificate · undo" bar.
+ * - `conversation.input.overlay` — the floating "improved · certificate" bubble. The host pins
+ *   this slot's anchor at zero height to the top edge of the composer card, so the bubble
+ *   never takes layout space (the `conversation.input.dock` row it used to sit in did).
  *
  * Slot contract verified against @deepseek-ai/dsh-client-ui-conversation 0.1.5-rc.1:
  * a session-scoped entry receives `useInput` + `inputActions` (the standard session
@@ -98,12 +100,12 @@ export function apply(ctx: ClientContext): void {
     }
   }, 'dsh-improve-prompt: composer button')
 
-  // Above the composer card: the certificate and the undo affordance.
+  // Floating over the transcript, just above the composer card: the certificate bubble.
   ctx.effect(() => {
     try {
-      return ctx.slots.inject('conversation.input.dock', function* () {
+      return ctx.slots.inject('conversation.input.overlay', function* () {
         yield ctx.slots.register({
-          name: 'conversation.input.dock',
+          name: 'conversation.input.overlay',
           id: 'dsh-improve-prompt-bar',
           order: 40,
           locale: NS,
