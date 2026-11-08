@@ -24,7 +24,7 @@ dsh plugin --profile web add dsh-improve-prompt
 dsh plugin --profile web add github:hoyyang/dsh-improve-prompt
 ```
 
-Restart `dsh web`; a **✦** appears in the composer tool row, left of the submit action. **Zero configuration** — no API key; it uses the harness's own model service and credential store. Requires `dsh >= 0.1.1-rc.2` (verified on `0.1.5-rc.1`).
+Restart `dsh web`; a **✦** appears in the composer tool row, left of the submit action. **Zero configuration** — no API key; it uses the harness's own model service and credential store. Requires `dsh >= 0.1.1-rc.2` (verified on `0.1.5-rc.1` and `0.2.2-rc.1`); the published artifact has **zero runtime dependencies**, so market/pnpm installs need no extra packages.
 
 ```sh
 dsh plugin --profile web remove dsh-improve-prompt   # uninstall
@@ -291,12 +291,12 @@ The host half is one loopback route plus the orchestrator; the browser half regi
 
 Everything below was actually run before publishing:
 
-1. **88 tests, all green** — pure functions (hard-fact extraction / fidelity checking / length judgement / context trigger / output normalization / session history / slash-command splitting) plus **full orchestration against a stub model** (repair pass, re-append, refusal, timeout, cancellation, upstream failure, injection defence) plus the **built client bundle** (registration contract, disabled states, click-to-write-back, failure leaving the draft untouched, undo, mode memory, localization and fallback).
+1. **92 tests, all green** — pure functions (hard-fact extraction / fidelity checking / length judgement / context trigger / output normalization / session history / slash-command splitting) plus **full orchestration against a stub model** (repair pass, re-append, refusal, timeout, cancellation, upstream failure, injection defence) plus the **built client bundle** (registration contract, disabled states, click-to-write-back, failure leaving the draft untouched, undo, mode memory, localization and fallback).
 2. **Strict TypeScript checks** pass for both halves (`npm run typecheck` and `typecheck:client`).
 3. **Cold-start three-failure static check green**: link-dependency junction, bundle manifest, disabled-state contradiction — plus a clean `dsh --dump-config` composition check.
 4. **Uninstall verified clean**: route unregistered, junction removed, zero profile-manifest residue, loader entry and client module table cleared.
 5. **Reinstall is idempotent**: a second inject reports "already active, skipping" and creates no duplicate entry.
-6. **Reverse-install acceptance**: installed from both `dsh plugin add dsh-improve-prompt` (npm) and `dsh plugin add github:hoyyang/dsh-improve-prompt` inside an isolated staging home; artifacts complete, config composition correct.
+6. **Market-style install acceptance (0.7.3+)**: installed inside an isolated staging home exactly as the market does — the profile template's own pnpm (`autoInstallPeers: false`) — then cold-started: no failed entries, `GET /dsh-improve-prompt/api/config` returns 200, and the boot manifest lists and successfully serves `client.js`. npm semantics (auto-installed peers) and `dsh plugin add github:hoyyang/dsh-improve-prompt` are re-checked for side effects. 0.7.2 failed exactly here (a bare `schemastery` import); the old npm-based check could not catch it.
 7. **Live end-to-end against a real model**: a draft carrying a path, an identifier, a version, a URL and backticked code came back at fidelity `5/5`, `1.0x` (example ① above).
 8. **Light mode measured**: a wordy English sentence came back at `0.6x` (example ②); a vague draft came back unchanged (example ③).
 9. **Smart context measured**: the same draft reports `contextUsed: anaphora` with a session id and genuinely references the conversation; without one it reports `none` and falls back to TBD markers.
@@ -320,7 +320,7 @@ Everything below was actually run before publishing:
 pnpm install
 npm run build          # host: tsc → lib/
 npm run build:client   # client: tsdown → lib/client.js (window.__ModuleLoader__ format)
-npm test               # 88 tests
+npm test               # 92 tests
 npm run typecheck && npm run typecheck:client
 ```
 

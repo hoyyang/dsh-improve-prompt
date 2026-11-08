@@ -24,7 +24,7 @@ dsh plugin --profile web add dsh-improve-prompt
 dsh plugin --profile web add github:hoyyang/dsh-improve-prompt
 ```
 
-重启 `dsh web`，输入框工具行（发送键左侧）出现 **✦** 即成功。**零配置**：不需要 API Key，走 harness 自带的模型服务与凭据存储。最低 `dsh >= 0.1.1-rc.2`（实测 `0.1.5-rc.1`）。
+重启 `dsh web`，输入框工具行（发送键左侧）出现 **✦** 即成功。**零配置**：不需要 API Key，走 harness 自带的模型服务与凭据存储。最低 `dsh >= 0.1.1-rc.2`（实测 `0.1.5-rc.1`、`0.2.2-rc.1`）；发布产物**零运行时依赖**，市场或 pnpm 安装不需要额外补包。
 
 ```sh
 dsh plugin --profile web remove dsh-improve-prompt   # 卸载
@@ -291,12 +291,12 @@ composer 草稿
 
 发布前跑过的验证，逐条都是实跑结果：
 
-1. **88 个单测全绿** —— 纯函数（硬事实抽取 / 保真校验 / 长度判定 / 上下文判定 / 输出规范化 / 会话历史 / 斜杠命令切分）＋ 用 stub 模型驱动的**完整编排**（修复轮、回灌、拒绝、超时、取消、上游异常、注入防护）＋ **加载真实 client bundle** 的界面行为（注册契约 / 禁用态 / 点击回填 / 失败不动草稿 / 撤回 / 档位记忆 / 本地化与回退）。
+1. **92 个单测全绿** —— 纯函数（硬事实抽取 / 保真校验 / 长度判定 / 上下文判定 / 输出规范化 / 会话历史 / 斜杠命令切分）＋ 用 stub 模型驱动的**完整编排**（修复轮、回灌、拒绝、超时、取消、上游异常、注入防护）＋ **加载真实 client bundle** 的界面行为（注册契约 / 禁用态 / 点击回填 / 失败不动草稿 / 撤回 / 档位记忆 / 本地化与回退）。
 2. **host / client 双 TypeScript 严格检查**通过（`npm run typecheck` 与 `typecheck:client`）。
 3. **冷启动三故障静态检测全绿**：link 依赖 junction、bundle manifest、disabled 状态矛盾；外加 `dsh --dump-config` 组合复检无错误。
 4. **卸载即净实测**：路由注销、junction 删除、profile 清单零残留、loader entry 与 client 模块表清理。
 5. **重装幂等实测**：二次注入返回「已激活运行，跳过注入」，不产生重复条目。
-6. **反向安装验收**：在隔离 staging home 里分别用 `dsh plugin add dsh-improve-prompt`（npm）与 `dsh plugin add github:hoyyang/dsh-improve-prompt` 各装一次，产物完整、配置组合正确。
+6. **市场式安装验收（0.7.3 起）**：在隔离 staging home 里按市场同款方式安装——profile 模板原样的 pnpm（`autoInstallPeers: false`）——然后冷启动：零 failed 条目、`GET /dsh-improve-prompt/api/config` 返回 200、boot manifest 含并成功拉取 `client.js`；另用 npm 语义（自动补 peer）与 `dsh plugin add github:hoyyang/dsh-improve-prompt` 各装一次确认无副作用。0.7.2 正是在这一条上翻车（裸 `schemastery` import），旧验收走 npm 语义所以没拦住。
 7. **真实模型端到端**：含路径 + 标识符 + 版本号 + URL + 反引号代码的草稿 → 保真 `5/5`、`1.0x`（见上方实测对照①）。
 8. **轻档去废话实测**：英文口语长句 → `0.6x`（对照②）；空泛输入 → 原样返回（对照③）。
 9. **智能上下文实测**：同一句「把那个接口加上限流」带 sessionId 时报 `contextUsed: anaphora` 并真的引用了会话内容；不带 sessionId 时报 `none` 并改用 TBD 标注。

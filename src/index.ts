@@ -17,7 +17,6 @@
  * @module dsh-improve-prompt
  */
 
-import z from 'schemastery'
 import { resolveConfig, type Mode, type ResolvedConfig } from './config.js'
 import { improveDraft, ERR, type ImproveDeps, type SessionsFace } from './orchestrate.js'
 import type { LlmFace, Route } from './llm-call.js'
@@ -42,8 +41,6 @@ export const name = 'dsh-improve-prompt'
 
 /** Required services: the model registry and the HTTP carrier. */
 export const inject = ['llm', 'webServer']
-
-export { Config } from './config.js'
 
 /** Route namespace. */
 const API = '/dsh-improve-prompt/api'

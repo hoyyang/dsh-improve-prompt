@@ -42,3 +42,28 @@ test('the effort reaches the call and the certificate names the model once', asy
   // certificate must not render it twice ("zhipuai/zhipuai/...").
   assert.equal(out.meta.model, 'zhipuai/glm-5.3-flash')
 })
+
+// 2026-11-09: a market install never gets peerDependencies. The DSH profile
+// template pins pnpm to `autoInstallPeers: false`, so anything outside Node
+// builtins and the plugin's own files is simply absent at boot — 0.7.2 shipped
+// `import z from 'schemastery'` and every pnpm/market install failed to load
+// with ERR_MODULE_NOT_FOUND while a repo link (with dev deps) hid the bug.
+// This guards the packaged output, not the source: a dev-only node_modules
+// cannot make it pass.
+test('the published host half imports nothing but node builtins and local files', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs')
+  const { fileURLToPath } = await import('node:url')
+  const { join } = await import('node:path')
+  const libDir = fileURLToPath(new URL('../lib/', import.meta.url))
+  const offenders = []
+  for (const file of readdirSync(libDir).filter((name) => name.endsWith('.js'))) {
+    const text = readFileSync(join(libDir, file), 'utf8')
+    for (const pattern of [/^\s*import\s[^\n]*?from\s+['"]([^'"]+)['"]/gm, /^\s*export\s[^\n]*?from\s+['"]([^'"]+)['"]/gm]) {
+      for (const match of text.matchAll(pattern)) {
+        const specifier = match[1]
+        if (!specifier.startsWith('.') && !specifier.startsWith('node:')) offenders.push(`${file}: ${specifier}`)
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], 'packaged host files must not import bare packages: ' + offenders.join(', '))
+})

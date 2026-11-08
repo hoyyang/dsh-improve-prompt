@@ -1,9 +1,16 @@
 /**
- * Plugin configuration: schema, defaults, and defensive resolution.
+ * Plugin configuration: defaults and defensive resolution.
+ *
+ * Deliberately no runtime dependency: the published host half must import with
+ * nothing but Node builtins, because a DSH profile installs bundles through
+ * pnpm with `autoInstallPeers: false`, so a peer package is simply absent at
+ * boot (that exact failure — `Cannot find package 'schemastery'` — stopped
+ * dsh-improve-prompt 0.7.2 from loading in market installs). Every key below is
+ * coerced here instead of by a loader schema; invalid values fall back to the
+ * default rather than failing startup.
  *
  * @module dsh-improve-prompt/config
  */
-import z from 'schemastery';
 /** Enhancement mode. */
 export type Mode = 'light' | 'standard';
 /** Runtime configuration after defaults are applied. */
@@ -26,44 +33,6 @@ export interface ResolvedConfig {
     readonly reasoningEffort: string;
     readonly logFailures: boolean;
 }
-/** Loader schema — every key optional, defaults declared here. */
-export declare const Config: z<Schemastery.ObjectS<{
-    defaultMode: z<string, string>;
-    lightMaxRatio: z<number, number>;
-    standardMaxRatio: z<number, number>;
-    acceptanceCriteria: z<boolean, boolean>;
-    temperature: z<number, number>;
-    maxTokens: z<number, number>;
-    timeoutMs: z<number, number>;
-    maxInputChars: z<number, number>;
-    contextTurns: z<number, number>;
-    contextChars: z<number, number>;
-    smartContext: z<boolean, boolean>;
-    fidelityGate: z<boolean, boolean>;
-    lengthGate: z<boolean, boolean>;
-    provider: z<string, string>;
-    model: z<string, string>;
-    reasoningEffort: z<string, string>;
-    logFailures: z<boolean, boolean>;
-}>, Schemastery.ObjectT<{
-    defaultMode: z<string, string>;
-    lightMaxRatio: z<number, number>;
-    standardMaxRatio: z<number, number>;
-    acceptanceCriteria: z<boolean, boolean>;
-    temperature: z<number, number>;
-    maxTokens: z<number, number>;
-    timeoutMs: z<number, number>;
-    maxInputChars: z<number, number>;
-    contextTurns: z<number, number>;
-    contextChars: z<number, number>;
-    smartContext: z<boolean, boolean>;
-    fidelityGate: z<boolean, boolean>;
-    lengthGate: z<boolean, boolean>;
-    provider: z<string, string>;
-    model: z<string, string>;
-    reasoningEffort: z<string, string>;
-    logFailures: z<boolean, boolean>;
-}>>;
 /**
  * Apply defaults and reject nonsense without ever throwing at the user.
  *

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.3
+
+市场/命令行安装后**整插件启动失败**的兼容性修复（2026-11-09，DSH 0.2.2-rc.1 实测复现）：
+
+- **根因**：`lib/config.js` 里 `import z from 'schemastery'`，而 `schemastery` 只声明为 peerDependency；DSH profile 的 `pnpm-workspace.yaml` 固定 `autoInstallPeers: false`，市场/CLI 安装不会补装 peer。宿主 import 时直接 `ERR_MODULE_NOT_FOUND` → loader 条目 failed → 市场显示「启动时没能加载」，host 半区不激活，输入框按钮也随之消失。本机开发态用 `link:` 到源码仓、仓库 `node_modules` 里有开发期依赖，把这个坑盖住了；该问题与 DSH 版本无关，0.2.1 市场安装同样会触发。
+- **修复**：host 半区移除 `schemastery`（连同配置 schema 一起），发布产物**零运行时依赖**，只用 Node 内置模块与自身文件；`peerDependencies` 同步删掉运行时不存在的 `schemastery` 与 `cordis`。配置行为不变：`resolveConfig` 本就逐键做类型判断与默认值回落，非法值一律回退默认而不是让启动失败。
+- **护栏**：新增单测扫描 `lib/*.js`，断言裸 import 只能是相对路径或 `node:`——下次再把开发期依赖带进发布产物会直接测试失败。测试 91 → 92。
+- **代价**：插件管理器里该插件的配置字段 schema 提示消失（配置本身仍生效，YAML 覆盖不受影响）。
+
 ## 0.7.2
 
 深思考模型适配（GLM-5.3-flash @ effort=max 实测驱动，2026-09-24）：默认模型切到深思考后，「点击无结果」高频复现——单次 90 字改写实测耗时 50.5s（占 60s 超时预算 84%），草稿稍复杂即 `TIMEOUT`；思考 token 计入 completion 上限，复杂草稿可烧光 2000 token 报 `EMPTY`。

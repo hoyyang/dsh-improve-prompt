@@ -36,7 +36,6 @@ export interface HostContext {
 export declare const name = "dsh-improve-prompt";
 /** Required services: the model registry and the HTTP carrier. */
 export declare const inject: string[];
-export { Config } from './config.js';
 /**
  * Attach the plugin.
  *
