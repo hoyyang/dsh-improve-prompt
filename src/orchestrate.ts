@@ -136,6 +136,12 @@ export async function improveDraft(deps: ImproveDeps, cfg: ResolvedConfig, input
   }
   const started = Date.now()
 
+  // Provider routes that dispatch on a per-call session identity (opencode-go's
+  // `x-opencode-session`) refuse a one-shot call without one. The composer always
+  // names its session; a procedure calling the loopback API may omit it, so keep a
+  // synthetic id for that case only.
+  const llmSessionId = input.sessionId !== '' ? input.sessionId : 'dsh-improve-prompt-' + String(Date.now())
+
   // ---- context: only when the draft cannot stand alone ----
   const trigger = cfg.smartContext && cfg.contextTurns > 0
     ? contextTrigger(draft)
@@ -157,7 +163,7 @@ export async function improveDraft(deps: ImproveDeps, cfg: ResolvedConfig, input
   const maxRatio = maxRatioFor(cfg, input.mode)
 
   const first = await callModel(deps.llm, {
-    route, system, config: cfg, signal: input.signal,
+    route, system, config: cfg, signal: input.signal, sessionId: llmSessionId,
     userMessage: buildUserMessage(draft, contextBlock, ''),
   })
   if (!first.ok) return failureOf(first.failure, cfg)
@@ -179,7 +185,7 @@ export async function improveDraft(deps: ImproveDeps, cfg: ResolvedConfig, input
     if (fidelity.missing.length > 0) clauses.push(repairClause(fidelity.missing))
 
     const repair = await callModel(deps.llm, {
-      route, system, config: cfg, signal: input.signal,
+      route, system, config: cfg, signal: input.signal, sessionId: llmSessionId,
       userMessage: buildUserMessage(draft, contextBlock, clauses.join('\n')),
     })
     if (repair.ok) {
