@@ -29,6 +29,23 @@ export interface GenerateOptions {
     maxTokens?: number;
     signal?: AbortSignal;
     reasoningEffort?: string;
+    /**
+     * Per-call session identity. The pi-ai adapter forwards it to providers that
+     * route on a session header; opencode-go rejects every request without
+     * `x-opencode-session` (HTTP 400 `MissingSessionID`).
+     */
+    sessionId?: string;
+}
+/**
+ * The reason a stream finished. Adapter failures — an unreachable endpoint, a
+ * refused request, a dropped stream — arrive here as `kind: 'error'` with the
+ * provider's own failure payload instead of being thrown.
+ */
+export interface FinishReason {
+    readonly kind: string;
+    readonly failure?: {
+        readonly message?: string;
+    };
 }
 /** One streamed chunk: only the discriminants this plugin reads are named. */
 export type StreamChunk = {
@@ -38,6 +55,7 @@ export type StreamChunk = {
     readonly type: 'tool-call-delta';
 } | {
     readonly type: 'finish';
+    readonly reason?: FinishReason;
 } | {
     readonly type: string;
 };
@@ -78,6 +96,8 @@ export interface CallRequest {
     readonly userMessage: string;
     readonly config: ResolvedConfig;
     readonly signal: AbortSignal;
+    /** Session identity forwarded to the provider; optional for one-shot callers. */
+    readonly sessionId?: string;
 }
 /** Reason a route could not be resolved. */
 export declare class NoRouteError extends Error {

@@ -31,13 +31,29 @@ export interface GenerateOptions {
   maxTokens?: number
   signal?: AbortSignal
   reasoningEffort?: string
+  /**
+   * Per-call session identity. The pi-ai adapter forwards it to providers that
+   * route on a session header; opencode-go rejects every request without
+   * `x-opencode-session` (HTTP 400 `MissingSessionID`).
+   */
+  sessionId?: string
+}
+
+/**
+ * The reason a stream finished. Adapter failures — an unreachable endpoint, a
+ * refused request, a dropped stream — arrive here as `kind: 'error'` with the
+ * provider's own failure payload instead of being thrown.
+ */
+export interface FinishReason {
+  readonly kind: string
+  readonly failure?: { readonly message?: string }
 }
 
 /** One streamed chunk: only the discriminants this plugin reads are named. */
 export type StreamChunk =
   | { readonly type: 'text-delta'; readonly text: string }
   | { readonly type: 'tool-call-delta' }
-  | { readonly type: 'finish' }
+  | { readonly type: 'finish'; readonly reason?: FinishReason }
   | { readonly type: string }
 
 /** The slice of `ctx.llm` this plugin uses. */
@@ -68,6 +84,8 @@ export interface CallRequest {
   readonly userMessage: string
   readonly config: ResolvedConfig
   readonly signal: AbortSignal
+  /** Session identity forwarded to the provider; optional for one-shot callers. */
+  readonly sessionId?: string
 }
 
 /** Reason a route could not be resolved. */
@@ -143,6 +161,7 @@ export async function callModel(llm: LlmFace, request: CallRequest): Promise<Cal
 
   let text = ''
   let sawToolCall = false
+  let finishFailure: FinishReason | null = null
   try {
     const options: GenerateOptions = {
       provider: request.route.provider,
@@ -156,6 +175,10 @@ export async function callModel(llm: LlmFace, request: CallRequest): Promise<Cal
     // Only send a reasoning effort when the user asked for one: gateways disagree
     // on whether they accept the parameter at all.
     if (request.config.reasoningEffort !== '') options.reasoningEffort = request.config.reasoningEffort
+    // The agent loop always names its session; a host-side one-shot call must do
+    // the same or a session-routed gateway (opencode-go) refuses the request before
+    // any model token is produced.
+    if (typeof request.sessionId === 'string' && request.sessionId !== '') options.sessionId = request.sessionId
 
     const iterator = llm.stream(options)[Symbol.asyncIterator]()
     let finished = false
@@ -166,7 +189,13 @@ export async function callModel(llm: LlmFace, request: CallRequest): Promise<Cal
         const chunk = step.value
         if (chunk.type === 'text-delta') text += (chunk as { text: string }).text
         else if (chunk.type === 'tool-call-delta') sawToolCall = true
-        else if (chunk.type === 'finish') finished = true
+        else if (chunk.type === 'finish') {
+          finished = true
+          // Adapter failures arrive as a terminal finish chunk, never as a throw;
+          // keep the reason so a failed call cannot masquerade as an empty answer.
+          const reason = (chunk as { reason?: FinishReason }).reason
+          if (reason !== undefined && (reason.kind === 'error' || reason.kind === 'aborted')) finishFailure = reason
+        }
       }
     } finally {
       // Release the upstream stream on every exit path, including cancellation.
@@ -185,6 +214,15 @@ export async function callModel(llm: LlmFace, request: CallRequest): Promise<Cal
 
   if (timedOut) return { ok: false, failure: { code: 'TIMEOUT' } }
   if (request.signal.aborted) return { ok: false, failure: { code: 'ABORTED' } }
+  // A terminal failure reason means the provider produced no usable text: surface
+  // the provider's own message instead of the generic EMPTY that hides the cause.
+  if (finishFailure !== null) {
+    const detail = finishFailure.failure?.message
+    const message = typeof detail === 'string' && detail !== ''
+      ? detail
+      : 'provider stream ended with ' + finishFailure.kind
+    return { ok: false, failure: { code: 'UPSTREAM', message } }
+  }
   if (sawToolCall && text.trim() === '') return { ok: false, failure: { code: 'TOOL_CALL' } }
   if (text.trim() === '') return { ok: false, failure: { code: 'EMPTY' } }
   return { ok: true, text }
