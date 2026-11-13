@@ -14,7 +14,7 @@
  * - **the plate is always dark** — `#061024 -> #0c2144` glass, in both themes.
  * - **the border is a conic gradient** — width-independent, every hue always on the rim.
  * - **the aurora lives inside the chip** — a cyan pool over the main action, an
- *   electric-blue pool over the switch zone, gold catching the lower edge.
+ *   electric-blue pool over the switch zone (left), gold catching the lower edge.
  * - **collapse = content technique, not squish** — the label, divider and switch
  *   zone animate `max-width`/`opacity` (the dsh-concise label craft), the main
  *   zone animates `gap`/`padding`; the pill radius morphs circle <-> pill for free.
@@ -30,9 +30,9 @@
  *   `.dip-aurora`  — contained washes, `z-index:0`, `pointer-events:none`
  *   `.dip-ring`    — conic gradient masked to the 1px border band, `z-index:1`
  *   `.dip-arc`     — busy-only energy bar on the bottom 2px, `z-index:1`
- *   `.dip-btn`     — main zone, `z-index:2`; spark (icon slot) + icon + label inside
+ *   `.dip-chevron` — switch zone (left), `z-index:2`; `.dip-caret` glyph inside
  *   `.dip-divider` — hairline, `z-index:2`
- *   `.dip-chevron` — switch zone, `z-index:2`; `.dip-caret` glyph inside
+ *   `.dip-btn`     — main zone (right, under the pinned edge), `z-index:2`; spark (icon slot) + icon + label inside
  *   `.dip-burst`   — press shockwave, `z-index:1`, one-shot on `:active`
  *
  * No light source ever sits under a glyph: the spark owns the icon slot, the rim is
@@ -67,10 +67,10 @@ const PLATE = 'linear-gradient(135deg,#061024 0%,#08182e 52%,#0c2144 100%)'
 const RIM = 'conic-gradient(from 200deg at 50% 50%,#22d3ee 0%,#38bdf8 15%,#2b6cff 38%,#1d4ed8 52%,#f5c542 80%,#ffe9a8 90%,#22d3ee 100%)'
 /** Contained light: a pool per zone plus the gold lower edge, all inside the chip. */
 const AURORA = [
-  'radial-gradient(30% 62% at 16% 48%,rgba(34,211,238,.42),transparent 70%)',
-  'radial-gradient(28% 62% at 62% 42%,rgba(37,99,235,.42),transparent 72%)',
-  // the switch zone carries its own pool: the divider is not the end of the glass
-  'radial-gradient(30% 64% at 96% 46%,rgba(43,108,255,.44),transparent 74%)',
+  'radial-gradient(30% 62% at 44% 48%,rgba(34,211,238,.42),transparent 70%)',
+  'radial-gradient(28% 62% at 74% 42%,rgba(37,99,235,.42),transparent 72%)',
+  // the switch zone (left edge) carries its own pool: the divider is not the end of the glass
+  'radial-gradient(30% 64% at 4% 46%,rgba(43,108,255,.44),transparent 74%)',
   'radial-gradient(34% 70% at 62% 116%,rgba(245,197,66,.26),transparent 74%)',
   // the body stays dark between the pools: that contrast is what reads as glass, not jelly
   'radial-gradient(130% 160% at 50% 50%,rgba(6,20,48,.66),transparent 80%)',
@@ -166,6 +166,10 @@ export const css = [
   'text-shadow:0 1px 6px rgba(4,8,18,.8),0 0 12px rgba(43,108,255,.35);',
   'transition:max-width .3s cubic-bezier(.4,0,.2,1),opacity .22s ease,transform .3s cubic-bezier(.4,0,.2,1)}',
   EXPANDED + ' .dip-label{max-width:64px;opacity:1;transform:none}',
+  // Fixed width across modes: both names stack in one cell; only the active one is visible.
+  '.dip-label{display:inline-grid}',
+  '.dip-label-text{grid-area:1/1}',
+  '.dip-label-text[data-active="false"]{visibility:hidden}',
 
   /* ---------- the hairline divider ---------- */
   '.dip-divider{position:relative;z-index:2;width:1px;max-width:0;opacity:0;align-self:stretch;margin:7px 0;pointer-events:none;',
@@ -188,8 +192,24 @@ export const css = [
   '.dip-chevron:hover .dip-caret{transform:translateY(1px)}',
   '.dip-chevron:active .dip-caret{transform:translateY(1px) scale(.88)}',
 
+  /* ---------- refined: the chip becomes the Revert | Retry capsule ---------- */
+  // Same plate and hairline as the expanded chip; both halves stay visible, no hover needed.
+  '.dip-root[data-refined="true"] .dip-divider{max-width:1px;opacity:1}',
+  '.dip-revert,.dip-retry{position:relative;z-index:2;display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border:0;background:transparent;',
+  'cursor:pointer;outline:none;white-space:nowrap;line-height:1;font-size:12px;font-weight:600;letter-spacing:.15px;',
+  'color:' + INK + ';text-shadow:0 1px 6px rgba(4,8,18,.8),0 0 12px rgba(43,108,255,.35);',
+  'transition:background-color .18s ease}',
+  '.dip-revert:hover,.dip-retry:hover{background:linear-gradient(180deg,rgba(125,211,252,.12),rgba(43,108,255,.10))}',
+  '.dip-revert:focus-visible,.dip-retry:focus-visible{box-shadow:inset 0 0 0 2px rgba(125,211,252,.8)}',
+  '.dip-revert:active,.dip-retry:active{filter:brightness(1.3)}',
+  '.dip-capsule-icon{display:block;flex:none;filter:drop-shadow(0 1px 3px rgba(4,8,18,.85)) drop-shadow(0 0 6px rgba(43,108,255,.45));',
+  'transition:transform .2s cubic-bezier(.34,1.56,.64,1)}',
+  '.dip-revert:hover .dip-capsule-icon{transform:translateX(-1px)}',
+  '.dip-retry:hover .dip-capsule-icon{transform:rotate(60deg)}',
+
   /* ---------- press: energy, not geometry ---------- */
-  '.dip-burst{position:absolute;left:16px;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;',
+  // Centred on the expanded star: switch 24px + divider 1px + main left padding 9px + half icon 7.5px.
+  '.dip-burst{position:absolute;left:41px;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;',
   'border-radius:999px;pointer-events:none;z-index:1;opacity:0;',
   'border:2px solid rgba(125,211,252,.85);transform:scale(.4)}',
   '.dip-root:active .dip-burst{animation:dip-burst .5s cubic-bezier(.2,.6,.35,1)}',
@@ -243,18 +263,21 @@ export const css = [
   '.dip-root:hover .dip-icon{filter:drop-shadow(0 0 6px rgba(125,211,252,.95)) drop-shadow(0 0 12px rgba(245,197,66,.4))}',
   '.dip-root[data-busy="true"] .dip-icon{filter:drop-shadow(0 0 6px rgba(125,211,252,.95)) drop-shadow(0 0 12px rgba(245,197,66,.45))}',
 
-  /* ---------- status / undo bar ---------- */
-  '.dip-bar{display:flex;align-items:center;gap:8px;margin:0 auto 6px;max-width:100%;padding:5px 10px;',
+  /* ---------- status bar ---------- */
+  // Rendered in the host's `conversation.input.overlay` anchor: a zero-height box pinned to
+  // the composer card's top edge. Positioned absolutely above it, the bubble paints over the
+  // transcript inside the sticky composer layer and never changes any element's size.
+  '.dip-bar{position:absolute;left:0;right:0;bottom:var(--dsh-composer-stack-gap,6px);width:fit-content;margin:0 auto;display:flex;align-items:center;gap:8px;',
+  'max-width:100%;box-sizing:border-box;padding:5px 10px;',
   'border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-elevated,var(--dsw-alias-bg-base));',
-  'font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary);box-shadow:0 1px 3px rgba(0,0,0,.06)}',
+  'font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary);box-shadow:0 4px 14px rgba(0,0,0,.18)}',
+  // Enter slides up and fades in; leave slides down and fades out. Only transform/opacity
+  // animate, so the overlay still never changes any element's layout.
+  '.dip-bar[data-state="entering"]{animation:dip-bar-in 200ms cubic-bezier(.2,.8,.2,1) both}',
+  '.dip-bar[data-state="leaving"]{animation:dip-bar-out 160ms ease-in both;pointer-events:none}',
   '.dip-bar[data-kind="error"]{border-color:rgba(220,90,70,.5);color:var(--dsw-alias-label-primary)}',
   '.dip-bar-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
   '.dip-sep{opacity:.4}',
-  '.dip-undo{margin-left:2px;padding:1px 8px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;',
-  'background:0 0;color:inherit;font-size:12px;cursor:pointer;outline:none;font-weight:500;',
-  'transition:background-color .15s ease,color .15s ease,transform .12s ease}',
-  '.dip-undo:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
-  '.dip-undo:active{transform:scale(.95)}',
 
   /* ---------- keyframes ---------- */
   '@keyframes dip-rim{to{transform:rotate(360deg)}}',
@@ -264,11 +287,13 @@ export const css = [
   '@keyframes dip-aurora{0%,100%{opacity:.7}50%{opacity:1}}',
   '@keyframes dip-spark-pulse{0%,100%{opacity:.5;transform:translateY(-50%) scale(.95)}50%{opacity:1;transform:translateY(-50%) scale(1.15)}}',
   '@keyframes dip-attract{0%,100%{box-shadow:' + SHADOW_IDLE + '}50%{box-shadow:' + SHADOW_ATTRACT + '}}',
+  '@keyframes dip-bar-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}',
+  '@keyframes dip-bar-out{from{opacity:1;transform:none}to{opacity:0;transform:translateY(6px)}}',
   '@keyframes dip-burst{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(3.4)}}',
 
   /* ---------- motion preferences: light freezes, legibility is untouched ---------- */
   '@media (prefers-reduced-motion: reduce){',
-  '.dip-root,.dip-ring,.dip-aurora,.dip-spark,.dip-icon,.dip-caret,.dip-chevron,.dip-burst,.dip-undo{animation:none!important;',
+  '.dip-root,.dip-ring,.dip-aurora,.dip-spark,.dip-icon,.dip-caret,.dip-chevron,.dip-burst,.dip-revert,.dip-retry,.dip-capsule-icon,.dip-bar{animation:none!important;',
   'transition-duration:.01ms!important}',
   '.dip-root:hover .dip-ring,.dip-root[data-busy="true"] .dip-ring{opacity:1}',
   // busy must still read as busy with motion off: a full-width static bar instead

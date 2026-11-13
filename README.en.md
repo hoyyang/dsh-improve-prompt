@@ -285,7 +285,7 @@ composer draft
    └─ final length judgement (a re-appended fact outranks the ceiling) ──► write back or refuse
 ```
 
-The host half is one loopback route plus the orchestrator; the browser half registers exactly two entries — a button on `conversation.input.right` and a status bar on `conversation.input.dock`. **Zero runtime dependencies** (`@deepseek-ai/dsh-llm` is a type-only import, erased at build).
+The host half is one loopback route plus the orchestrator; the browser half registers exactly two entries — a button on `conversation.input.right` and a status bar on `conversation.input.overlay`. **Zero runtime dependencies** (`@deepseek-ai/dsh-llm` is a type-only import, erased at build).
 
 ## Reliability and verification
 

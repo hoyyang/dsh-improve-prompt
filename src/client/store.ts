@@ -37,7 +37,7 @@ export interface SessionState {
   error: string | null
   /** Set while a request is in flight so the button can cancel it. */
   controller: AbortController | null
-  /** Captured from the button's slot props; the status bar reuses it to undo. */
+  /** Captured from the button's slot props; Revert/Retry reuse it to write the draft. */
   actions: InputActionsFace | null
 }
 
@@ -91,7 +91,7 @@ export function notify(sessionId: string): void {
 }
 
 /**
- * Reset one session to idle, dropping any stale undo information.
+ * Reset one session to idle, dropping any stale Revert/Retry information.
  *
  * @param sessionId - the session to reset.
  * @param phase - the phase to land on.

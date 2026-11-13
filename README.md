@@ -285,7 +285,7 @@ composer 草稿
    └─ 最终长度判定（回灌优先于上限）──► 写回 or 拒绝并说明
 ```
 
-宿主半是一个回环路由 + 编排器，浏览器半只在 `conversation.input.right` 注册一个按钮、在 `conversation.input.dock` 注册一个状态条。**运行时依赖为 0**（`@deepseek-ai/dsh-llm` 只作类型导入，构建后擦除）。
+宿主半是一个回环路由 + 编排器，浏览器半只在 `conversation.input.right` 注册一个按钮、在 `conversation.input.overlay` 注册一个状态条。**运行时依赖为 0**（`@deepseek-ai/dsh-llm` 只作类型导入，构建后擦除）。
 
 ## 可靠性与验收
 
